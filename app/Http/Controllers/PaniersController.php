@@ -1,0 +1,144 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Produits;
+use App\Models\Paniers;
+use App\Models\Tailles;
+use App\Models\Couleurs;
+use App\Models\Quantitedisponible;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class PaniersController extends Controller
+{
+    // Méthode pour ajouter un produit au panier
+    public function ajouteraupaniers(Request $request, $produitId)
+    {
+        // Vérification si l'utilisateur est connecté
+        if (!Auth::check()) {
+            return response()->json(['message' => 'Vous devez être connecté pour ajouter des produits au panier'], 401);
+        }
+
+        // Recherche du produit dans la base de données
+        $produit = Produits::find($produitId);
+
+        // Vérification si le produit existe
+        if (!$produit) {
+            return response()->json(['message' => 'Produit non trouvé'], 404);
+        }
+
+           // Récupération de la taille, de la couleur et de la quantité depuis la requête
+    $tailleNom = $request->input('taille');
+    $couleurNom = $request->input('couleur');
+    $quantite = $request->input('quantite');
+
+    // Vérification de la disponibilité de la taille
+    $taille = Tailles::where('nom', $tailleNom)->first();
+    if (!$taille) {
+        return response()->json(['message' => 'La taille spécifiée n\'est pas valide pour ce produit'], 400);
+    }
+
+    // Vérification de la disponibilité de la couleur
+    $couleur = Couleurs::where('nom', $couleurNom)->first();
+    if (!$couleur) {
+        return response()->json(['message' => 'La couleur spécifiée n\'est pas valide pour ce produit'], 400);
+    }
+
+    // Vérification de la quantité
+//$quantiteDisponible = $produit->quantite_disponible()->where('tailles_id', $taille->id)->where('couleurs_id', $couleur->id)->first();
+  //  if (!$quantiteDisponible || $quantite <= 0 || $quantite > $quantiteDisponible->quantite) {
+    //    return response()->json(['message' => 'La quantité spécifiée n\'est pas disponible pour ce produit'], 400);
+    //}
+    $quantiteDisponible = Quantitedisponible::where('produits_id', $produitId)
+    ->where('tailles_id', $taille->id)
+    ->where('couleurs_id', $couleur->id)
+    ->first();
+
+if (!$quantiteDisponible || $quantite <= 0 || $quantite > $quantiteDisponible->quantite) {
+    return response()->json(['message' => 'La quantité spécifiée n\'est pas disponible pour ce produit'], 400);
+}
+    // Ajout du produit au panier de l'utilisateur
+    $user = Auth::user();
+    $paniers = $user->paniers()->firstOrCreate([]);
+
+
+    $prixTotal = $produit->prix * $quantite;
+    // Ajoute le produit au panier
+    $paniers->produits()->attach($produitId, [
+        'taille' => $taille->nom,
+        'couleur' => $couleur->nom,
+        'quantite' => $quantite,
+        'prix_total' => $prixTotal
+    ]);
+
+    return response()->json(['message' => 'Produit ajouté au panier avec succès'], 200);
+   }
+   public function mettreAJourPanier(Request $request, $produitId)
+   {
+       if (!Auth::check()) {
+           return response()->json(['message' => 'Vous devez être connecté pour mettre à jour le panier'], 401);
+       }
+
+       $user = Auth::user();
+       $paniers = $user->paniers()->first();
+
+       if (!$paniers) {
+           return response()->json(['message' => 'Panier non trouvé'], 404);
+       }
+
+       $tailleNom = $request->input('taille');
+       $couleurNom = $request->input('couleur');
+       $quantite = $request->input('quantite');
+
+       $taille = Tailles::where('nom', $tailleNom)->first();
+       if (!$taille) {
+           return response()->json(['message' => 'La taille spécifiée n\'est pas valide pour ce produit'], 400);
+       }
+
+       $couleur = Couleurs::where('nom', $couleurNom)->first();
+       if (!$couleur) {
+           return response()->json(['message' => 'La couleur spécifiée n\'est pas valide pour ce produit'], 400);
+       }
+
+       $quantiteDisponible = Quantitedisponible::where('produits_id', $produitId)
+           ->where('tailles_id', $taille->id)
+           ->where('couleurs_id', $couleur->id)
+           ->first();
+
+       if (!$quantiteDisponible || $quantite <= 0 || $quantite > $quantiteDisponible->quantite) {
+           return response()->json(['message' => 'La quantité spécifiée n\'est pas disponible pour ce produit'], 400);
+       }
+
+       $prixTotal = $produit->prix * $quantite;
+
+       $paniers->produits()->updateExistingPivot($produitId, [
+           'taille' => $taille->nom,
+           'couleur' => $couleur->nom,
+           'quantite' => $quantite,
+           'prix_total' => $prixTotal
+       ]);
+
+       return response()->json(['message' => 'Produit mis à jour dans le panier avec succès'], 200);
+   }
+
+   // Méthode pour retirer un produit du panier
+   public function retirerDuPanier($produitId)
+   {
+       if (!Auth::check()) {
+           return response()->json(['message' => 'Vous devez être connecté pour retirer des produits du panier'], 401);
+       }
+
+       $user = Auth::user();
+       $paniers = $user->paniers()->first();
+
+       if (!$paniers) {
+           return response()->json(['message' => 'Panier non trouvé'], 404);
+       }
+
+       $paniers->produits()->detach($produitId);
+
+       return response()->json(['message' => 'Produit retiré du panier avec succès'], 200);
+   }
+};
