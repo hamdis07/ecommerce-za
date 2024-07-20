@@ -13,7 +13,7 @@ class PaniersProduits extends Pivot
     // Méthode pour calculer le prix total de chaque produit dans le panier
     public function panier()
     {
-        return $this->belongsTo(Panneaux::class);
+        return $this->belongsTo(Paniers::class);
     }
 
     public function produit()

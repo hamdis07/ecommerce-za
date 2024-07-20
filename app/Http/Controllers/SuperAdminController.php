@@ -1,12 +1,12 @@
 <?php
 
-
 namespace App\Http\Controllers;
+
 use App\Models\User;
-use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Spatie\Permission\Models\Role;
 
 class SuperAdminController extends Controller
 {
@@ -24,112 +24,103 @@ class SuperAdminController extends Controller
             'user_name' => 'required|string|max:255|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Assuming image is optional
+            'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ];
-        // 2. Validate request data
-        $validatedData = $request->validate($rules);
-       dd($validatedData);
 
-        // 3. Retrieve all data from the request
-        $nom = $validatedData['nom'];
-        $prenom = $validatedData['prenom'];
-        $genre = $validatedData['genre'];
-        $date_de_naissance = $validatedData['date_de_naissance'];
-        $addresse = $validatedData['addresse'];
-        $occupation = $validatedData['occupation'];
-        $etat_social = $validatedData['etat_social'];
-        $numero_telephone = $validatedData['numero_telephone'];
-        $user_name = $validatedData['user_name'];
-        $email = $validatedData['email'];
-        $password = Hash::make($validatedData['password']);
-        // Assuming you have some logic to handle image upload and get $imageUrl
+        // Valider les données de la requête
+        $validatedData = $request->validate($rules);
+
+        // Traiter l'upload d'image si disponible
         $imageUrl = "";
         if ($request->hasFile('image')) {
             $image = $request->file('image');
             $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->move(public_path('images'), $imageName); // Move the uploaded file to the public/images directory
-            $imageUrl = asset('images/' . $imageName); // Save the relative path to the image
+            $image->move(public_path('images'), $imageName);
+            $imageUrl = asset('images/' . $imageName);
         }
 
-        // 4. Create the user with the validated data
+        // Créer un nouvel utilisateur avec les données validées
         $user = User::create([
-            'nom' => $nom,
-            'prenom' => $prenom,
-            'genre' => $genre,
-            'date_de_naissance' => $date_de_naissance,
-            'Addresse' => $addresse,
-            'occupation' => $occupation,
-            'etat_social' => $etat_social,
-            'numero_telephone' => $numero_telephone,
-            'user_name' => $user_name,
-            'email' => $email,
+            'nom' => $validatedData['nom'],
+            'prenom' => $validatedData['prenom'],
+            'genre' => $validatedData['genre'],
+            'date_de_naissance' => $validatedData['date_de_naissance'],
+            'addresse' => $validatedData['addresse'],
+            'occupation' => $validatedData['occupation'],
+            'etat_social' => $validatedData['etat_social'],
+            'numero_telephone' => $validatedData['numero_telephone'],
+            'user_name' => $validatedData['user_name'],
+            'email' => $validatedData['email'],
             'email_verified_at' => now(),
-            'image' => $imageUrl,
-            'password' => $password,
+            'user_image' => $imageUrl,
+            'password' => Hash::make($validatedData['password']),
         ]);
 
-        // Assign a role to the user
-
-        $role = Role::where('name', $request->role)->first(); // Changez 'admin' par le rôle désiré
-        $user->assignRole($role);
-        return response()->json("user created");
-    }
-    public function updateadmin(Request $request, $id)
-{
-    $rules = [
-        'nom' => 'sometimes|string|max:255',
-        'prenom' => 'sometimes|string|max:255',
-        'genre' => 'sometimes|string|in:Male,Female,Other',
-        'date_de_naissance' => 'sometimes|date',
-        'addresse' => 'sometimes|string|max:255',
-        'occupation' => 'sometimes|string|max:255',
-        'etat_social' => 'sometimes|string|max:255',
-        'numero_telephone' => 'sometimes|string|max:255',
-        'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
-        'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
-        'password' => 'nullable|string|min:8',
-        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Assuming image is optional
-    ];
-
-    // 1. Validate request data
-    $validatedData = $request->validate($rules);
-  //  dd();
-    // 2. Retrieve the user by ID
-    $user = User::findOrFail($id);
-
-    // 3. Update the user data with the validated data
-    $user->update($validatedData);
-
-    // 4. Update the password if provided
-    if ($request->filled('password')) {
-        $user->password = Hash::make($request->password);
-        $user->save();
-    }
-
-
-
-    // . Handle image upload
-    $imageUrl = $user->image; // Keep the current image URL by default
-    if ($request->hasFile('image')) {
-        $image = $request->file('image');
-        $imageName = time() . '_' . $image->getClientOriginalName();
-        $image->move(public_path('images'), $imageName);
-        $imageUrl = asset('images/' . $imageName);
-    }
-     // . Update the user's role
-     if ($request->has('role')) {
+        // Assigner un rôle à l'utilisateur
         $role = Role::where('name', $request->role)->first();
         if ($role) {
-            $user->syncRoles([$role->id]);
+            $user->assignRole([$role->id]);
         }
+
+        return response()->json("Utilisateur créé avec succès");
     }
 
-    // 7. Update the user's image URL
-    $user->image = $imageUrl;
-    $user->save();
+    public function updateadmin(Request $request, $id)
+    {
+        $rules = [
+            'nom' => 'sometimes|string|max:255',
+            'prenom' => 'sometimes|string|max:255',
+            'genre' => 'sometimes|string|in:Male,Female,Other',
+            'date_de_naissance' => 'sometimes|date',
+            'addresse' => 'sometimes|string|max:255',
+            'occupation' => 'sometimes|string|max:255',
+            'etat_social' => 'sometimes|string|max:255',
+            'numero_telephone' => 'sometimes|string|max:255',
+            'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
+            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
+            'password' => 'nullable|string|min:8',
+            'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ];
 
-    return response()->json("User updated");
-}
+        // Valider les données de la requête
+        $validatedData = $request->validate($rules);
+
+        // Récupérer l'utilisateur par son ID
+        $user = User::findOrFail($id);
+
+        // Mettre à jour les données de l'utilisateur avec les données validées
+        $user->update($validatedData);
+
+        // Mettre à jour le mot de passe si fourni
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+            $user->save();
+        }
+
+        // Gérer l'upload d'image si disponible
+        $imageUrl = $user->user_image;
+        if ($request->hasFile('user_image')) {
+            $image = $request->file('user_image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $image->move(public_path('images'), $imageName);
+            $imageUrl = asset('images/' . $imageName);
+        }
+
+        // Mettre à jour le rôle de l'utilisateur
+        if ($request->has('role')) {
+            $role = Role::where('name', $request->role)->first();
+            if ($role) {
+                $user->syncRoles([$role->id]);
+            }
+        }
+
+        // Mettre à jour l'URL de l'image de l'utilisateur
+        $user->user_image = $imageUrl;
+        $user->save();
+
+        return response()->json("Utilisateur mis à jour avec succès");
+    }
+
 public function deleteUser($id)
 {
     $user = User::find($id);
@@ -168,9 +159,9 @@ public function rechercheradmin(Request $request)
     $query = User::query();
 
     // Filtre par statut
-    if ($request->has('statut')) {
-        $query->where('statut', $request->statut);
-    }
+   // if ($request->has('statut')) {
+   //     $query->where('statut', $request->statut);
+   // }
 
     // Filtre par nom
     if ($request->has('nom')) {
@@ -218,7 +209,7 @@ public function getUsersByRole(Request $request)
     // Retourner la liste des utilisateurs
     return response()->json(['users' => $users]);
 }
-use App\Models\User; // Assurez-vous d'importer le modèle User si ce n'est pas déjà fait
+ // Assurez-vous d'importer le modèle User si ce n'est pas déjà fait
 
 public function getAdmins()
 {

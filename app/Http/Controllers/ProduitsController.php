@@ -20,267 +20,259 @@ use App\Models\Magasins;
 
 class ProduitsController extends Controller
 {
+    public function nouveauproduit(Request $request)
+    {
+        try {
+            // Validation des données du formulaire pour le produit
+            $request->validate([
+                'references' => 'required|string',
+                'nom_produit' => 'required|string',
+                'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048', // Validation des images
+                'image_url' => 'nullable|file|mimetypes:image/jpeg,image/png,image/jpg,image/gif,video/mp4,video/mpeg,video/quicktime|max:204800', // Validation pour les images et les vidéos
+                'description' => 'required|string',
+                'prix_initial' => 'required|numeric',
+                'composition' => 'required|string',
+                'entretien' => 'required|string',
+                'genre' => 'required|string',
+                'categorie' => 'required|string',
+                'souscategorie' => 'required|string',
+                'mots_cles' => 'nullable|string',
+                'magasins' => 'required|array|min:1',
+                'magasins.*.nom' => 'required|string',
+                'magasins.*.adresse' => 'required|string',
+                'magasins.*.ville' => 'required|string',
+                'magasins.*.code_postal' => 'required|string',
+                'magasins.*.responsable' => 'required|string',
+                'magasins.*.telephone' => 'required|string',
+                'magasins.*.tailles' => 'required|array|min:1',
+                'magasins.*.couleurs' => 'required|array|min:1',
+                'magasins.*.quantites' => 'required|array|min:1',
+            ]);
 
+            // Logique pour traiter les images
 
- public function nouveauproduit(Request $request)
- {
+            // Vérification et création du genre
+            $genre = Genre::firstOrCreate(['nom' => $request->genre]);
 
-     try {
-         // Validation des données du formulaire pour le produit
-         $request->validate([
-             'references' => 'required|string',
-             'nom_produit' => 'required|string',
-             'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048', // Validation des images
-             'image_url' => 'nullable|file|mimetypes:image/jpeg,image/png,image/jpg,image/gif,video/mp4,video/mpeg,video/quicktime|max:204800', // Validation pour les images et les vidéos
-             'description' => 'required|string',
-             'prix_initial'=> 'required|numeric',
-             'composition' => 'required|string',
-             'entretien' => 'required|string',
-             'genre' => 'required|string',
-             'categorie' => 'required|string',
-             'sous_categorie' => 'required|string',
-             'mots_cles'=>'nullable|string',
-             'magasins' => 'required|array|min:1',
-             'magasins.*.nom' => 'required|string',
-             'magasins.*.adresse' => 'required|string',
-             'magasins.*.ville' => 'required|string',
-             'magasins.*.code_postal' => 'required|string',
-             'magasins.*.responsable' => 'required|string',
-             'magasins.*.telephone' => 'required|string',
-             'magasins.*.tailles' => 'required|array|min:1',
-             'magasins.*.couleurs' => 'required|array|min:1',
-             'magasins.*.quantites' => 'required|array|min:1',
-         ]);
-        // Logique pour traiter les images
+            // Vérification et création de la catégorie
+            $categorie = Categories::firstOrCreate(['nom' => $request->categorie]);
 
-         // Vérification et création du genre
-         $genre = Genre::firstOrCreate(['nom' => $request->genre]);
+            // Ajout de journalisation pour vérifier la valeur de souscategorie
+            \Log::info('Valeur de souscategorie : ' . $request->souscategorie);
 
-         // Vérification et création de la catégorie
-         $categorie = Categories::firstOrCreate(['nom' => $request->categorie]);
+            // Vérification et création de la sous-catégorie avec son association à la catégorie
+            $sousCategorie = SousCategories::firstOrCreate(['nom' => $request->souscategorie, 'categorie_id' => $categorie->id]);
 
-         // Vérification et création de la sous-catégorie avec son association à la catégorie
-         $sousCategorie = Sous_Categories::firstOrCreate(['nom' => $request->sous_categorie, 'categorie_id' => $categorie->id]);
+            // Création d'un nouveau produit
+            $produit = new Produits();
+            $produit->references = $request->references;
+            $produit->nom_produit = $request->nom_produit;
+            $produit->description = $request->description;
+            $produit->composition = $request->composition;
+            $produit->entretien = $request->entretien;
+            $produit->prix_initial = $request->prix_initial;
+            $produit->prix = $request->prix_initial; // Assigner la valeur de prix_initial à prix
+            $produit->genre_id = $genre->id;
+            $produit->categorie_id = $categorie->id;
+            $produit->souscategories_id= $sousCategorie->id;
+            $produit->mots_cles = $request->mots_cles;
 
+            // Traitement des images
 
-
-
-         // Création d'un nouveau produit
-         $produit = new Produits();
-         $produit->references = $request->references;
-         $produit->nom_produit = $request->nom_produit;
-         $produit->description = $request->description;
-         $produit->composition = $request->composition;
-         $produit->entretien = $request->entretien;
-         $produit->prix_initial = $request->prix_initial;
-         $produit->prix = $request->prix_initial; // Assigner la valeur de prix_initial à prix
-         $produit->genre_id = $genre->id;
-         $produit->categorie_id = $categorie->id;
-         $produit->sous_categorie_id = $sousCategorie->id;
-         $produit->mots_cles = $request->mots_cles;
-
-
-         // Traitement des images
-
-
-         // Traitement de la vidéo
-         if ($request->hasFile('image_url')) {
-             $video = $request->file('image_url');
-             $videoName = $video->getClientOriginalName();
-             $video->storeAs('public/videos', $videoName); // Stockage de la vidéo dans le dossier "storage/app/public/videos"
-             $produit->image_url = Storage::url('videos/' . $videoName); // Assurez-vous d'ajuster cela selon votre modèle
-         }
-
-         $produit->save();
-         $produit_id = $produit->getKey(); // ou $produit_id = $produit->id;
-
-         if ($request->hasFile('images')) {
-            $image = $request->file('images');
-            foreach ($request->file('images') as $imageFile) {
-                $imageName = $imageFile->getClientOriginalName();
-                $imageFile->storeAs('public/images', $imageName); // Stockage de l'image dans le dossier "storage/app/public/images"
-
-                // Création de l'enregistrement d'image dans la table images
-                $image = new images();
-                $image->chemin_image = 'public/images/' . $imageName; // Chemin d'accès relatif à l'image
-                $image->produit_id = $produit->id; // ID du produit associé à cette image
-                $image->save();
+            // Traitement de la vidéo
+            if ($request->hasFile('image_url')) {
+                $video = $request->file('image_url');
+                $videoName = $video->getClientOriginalName();
+                $video->storeAs('public/videos', $videoName); // Stockage de la vidéo dans le dossier "storage/app/public/videos"
+                $produit->image_url = Storage::url('videos/' . $videoName); // Assurez-vous d'ajuster cela selon votre modèle
             }
+
+            $produit->save();
+            $produit_id = $produit->getKey(); // ou $produit_id = $produit->id;
+
+            if ($request->hasFile('images')) {
+                $image = $request->file('images');
+                foreach ($request->file('images') as $imageFile) {
+                    $imageName = $imageFile->getClientOriginalName();
+                    $imageFile->storeAs('public/images', $imageName); // Stockage de l'image dans le dossier "storage/app/public/images"
+
+                    // Création de l'enregistrement d'image dans la table images
+                    $image = new images();
+                    $image->chemin_image = 'public/images/' . $imageName; // Chemin d'accès relatif à l'image
+                    $image->produit_id = $produit->id; // ID du produit associé à cette image
+                    $image->save();
+                }
+            }
+
+            // Pour chaque magasin
+            foreach ($request->magasins as $magasinData) {
+                // Vérifiez si le magasin existe déjà
+                $magasin = Magasins::where('nom', $magasinData['nom'])
+                    ->where('adresse', $magasinData['adresse'])
+                    ->where('ville', $magasinData['ville'])
+                    ->where('code_postal', $magasinData['code_postal'])
+                    ->where('responsable', $magasinData['responsable'])
+                    ->where('telephone', $magasinData['telephone'])
+                    ->first();
+
+                if (!$magasin) {
+                    // Le magasin n'existe pas encore, alors créez-le
+                    $magasin = Magasins::create([
+                        'nom' => $magasinData['nom'],
+                        'adresse' => $magasinData['adresse'],
+                        'ville' => $magasinData['ville'],
+                        'code_postal' => $magasinData['code_postal'],
+                        'responsable' => $magasinData['responsable'],
+                        'telephone' => $magasinData['telephone']
+                    ]);
+                }
+
+                // Pour chaque couleur, taille et quantité associée à ce magasin
+                foreach ($magasinData['couleurs'] as $index => $couleur) {
+                    // Vérifiez et créez la couleur si elle n'existe pas déjà
+                    $nouvelleCouleur = Couleurs::firstOrCreate(['nom' => $couleur]);
+
+                    // Vérifiez et créez la taille si elle n'existe pas déjà
+                    $nouvelleTaille = Tailles::firstOrCreate(['nom' => $magasinData['tailles'][$index]]);
+
+                    // Créez une nouvelle quantité disponible pour ce produit, cette couleur, cette taille et ce magasin
+                    $quantite = new Quantitedisponible();
+                    $quantite->magasin_id = $magasin->id;
+                    $quantite->produits_id = $produit->id;
+                    $quantite->couleurs_id = $nouvelleCouleur->id;
+                    $quantite->tailles_id = $nouvelleTaille->id;
+                    $quantite->quantite = $magasinData['quantites'][$index];
+                    $quantite->save();
+                }
+            }
+
+            // Redirection vers une page de succès ou d'accueil
+            return response()->json(['message' => 'Produit ajouté avec succès', 'produit' => $produit], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Gérer l'erreur de validation
+            return response()->json(['error' => $e->validator->errors()], 400);
+        } catch (\Exception $e) {
+            // Gérer toute autre exception
+            return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
 
+    public function modifierProduit(Request $request, $id)
+    {
+        try {
+            // Validation des données du formulaire pour le produit
+            $request->validate([
+                'nom_produit' => 'sometimes|string',
+                'images.*' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048', // Validation des images
+                'image_url' => 'sometimes|file|mimetypes:image/jpeg,image/png,image/jpg,image/gif,video/mp4,video/mpeg,video/quicktime|max:204800', // Validation pour les images et les vidéos
+                'description' => 'sometimes|string',
+                'prix_initial' => 'sometimes|numeric',
+                'composition' => 'sometimes|string',
+                'entretien' => 'sometimes|string',
+                'genre' => 'sometimes|string',
+                'categorie' => 'sometimes|string',
+                'souscategorie' => 'sometimes|string',
+                'mots_cles' => 'sometimes|string',
+                'magasins' => 'sometimes|array|min:1',
+                'magasins.*.nom' => 'sometimes|string',
+                'magasins.*.adresse' => 'sometimes|string',
+                'magasins.*.ville' => 'sometimes|string',
+                'magasins.*.code_postal' => 'sometimes|string',
+                'magasins.*.responsable' => 'sometimes|string',
+                'magasins.*.telephone' => 'sometimes|string',
+                'magasins.*.tailles' => 'sometimes|array|min:1',
+                'magasins.*.couleurs' => 'sometimes|array|min:1',
+                'magasins.*.quantites' => 'sometimes|array|min:1',
+            ]);
 
-         // Pour chaque magasin
-         foreach ($request->magasins as $magasinData) {
-             // Vérifiez si le magasin existe déjà
-             $magasin = Magasins::where('nom', $magasinData['nom'])
-                                 ->where('adresse', $magasinData['adresse'])
-                                 ->where('ville', $magasinData['ville'])
-                                 ->where('code_postal', $magasinData['code_postal'])
-                                 ->where('responsable', $magasinData['responsable'])
-                                 ->where('telephone', $magasinData['telephone'])
-                                 ->first();
+            // Récupération du produit à mettre à jour
+            $produit = Produits::findOrFail($id);
 
-             if (!$magasin) {
-                 // Le magasin n'existe pas encore, alors créez-le
-                 $magasin = Magasins::create([
-                     'nom' => $magasinData['nom'],
-                     'adresse' => $magasinData['adresse'],
-                     'ville' => $magasinData['ville'],
-                     'code_postal' => $magasinData['code_postal'],
-                     'responsable' => $magasinData['responsable'],
-                     'telephone' => $magasinData['telephone']
-                 ]);
-             }
+            // Mise à jour des champs du produit si présents dans la requête
+            $produit->fill($request->all());
+            $produit->save();
 
-             // Pour chaque couleur, taille et quantité associée à ce magasin
-             foreach ($magasinData['couleurs'] as $index => $couleur) {
-                 // Vérifiez et créez la couleur si elle n'existe pas déjà
-                 $nouvelleCouleur = Couleurs::firstOrCreate(['nom' => $couleur]);
+            // Traitement des images
 
-                 // Vérifiez et créez la taille si elle n'existe pas déjà
-                 $nouvelleTaille = Tailles::firstOrCreate(['nom' => $magasinData['tailles'][$index]]);
+            // Traitement de la vidéo
+            if ($request->hasFile('image_url')) {
+                $video = $request->file('image_url');
+                $videoName = $video->getClientOriginalName();
+                $video->storeAs('public/videos', $videoName); // Stockage de la vidéo dans le dossier "storage/app/public/videos"
+                $produit->image_url = Storage::url('videos/' . $videoName); // Assurez-vous d'ajuster cela selon votre modèle
+                $produit->save();
+            }
 
-                 // Créez une nouvelle quantité disponible pour ce produit, cette couleur, cette taille et ce magasin
-                 $quantite = new Quantite_disponible();
-                 $quantite->magasin_id = $magasin->id;
-                 $quantite->produits_id = $produit->id;
-                 $quantite->couleurs_id = $nouvelleCouleur->id;
-                 $quantite->tailles_id = $nouvelleTaille->id;
-                 $quantite->quantite = $magasinData['quantites'][$index];
-                 $quantite->save();
-             }
-         }
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $imageFile) {
+                    $imageName = $imageFile->getClientOriginalName();
+                    $imageFile->storeAs('public/images', $imageName); // Stockage de l'image dans le dossier "storage/app/public/images"
 
-         // Redirection vers une page de succès ou d'accueil
-         return response()->json(['message' => 'Produit ajouté avec succès', 'produit' => $produit], 201);
-     } catch (\Illuminate\Validation\ValidationException $e) {
-         // Gérer l'erreur de validation
-         return response()->json(['error' => $e->validator->errors()], 400);
-     } catch (\Exception $e) {
-         // Gérer toute autre exception
-         return response()->json(['error' => $e->getMessage()], 500);
-     }
- }
+                    // Création de l'enregistrement d'image dans la table images
+                    $image = new Images();
+                    $image->chemin_image = 'public/images/' . $imageName; // Chemin d'accès relatif à l'image
+                    $image->produit_id = $produit->id; // ID du produit associé à cette image
+                    $image->save();
+                }
+            }
 
- public function modifierProduit(Request $request, $id)
- {
-     try {
-         // Validation des données du formulaire pour le produit
-         $request->validate([
-             'nom_produit' => 'sometimes|string',
-             'images.*' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048', // Validation des images
-             'image_url' => 'sometimes|file|mimetypes:image/jpeg,image/png,image/jpg,image/gif,video/mp4,video/mpeg,video/quicktime|max:204800', // Validation pour les images et les vidéos
-             'description' => 'sometimes|string',
-             'prix_initial'=> 'sometimes|numeric',
-             'composition' => 'sometimes|string',
-             'entretien' => 'sometimes|string',
-             'genre' => 'sometimes|string',
-             'categorie' => 'sometimes|string',
-             'sous_categorie' => 'sometimes|string',
-             'mots_cles'=>'sometimes|string',
-             'magasins' => 'sometimes|array|min:1',
-             'magasins.*.nom' => 'sometimes|string',
-             'magasins.*.adresse' => 'sometimes|string',
-             'magasins.*.ville' => 'sometimes|string',
-             'magasins.*.code_postal' => 'sometimes|string',
-             'magasins.*.responsable' => 'sometimes|string',
-             'magasins.*.telephone' => 'sometimes|string',
-             'magasins.*.tailles' => 'sometimes|array|min:1',
-             'magasins.*.couleurs' => 'sometimes|array|min:1',
-             'magasins.*.quantites' => 'sometimes|array|min:1',
-         ]);
+            // Pour chaque magasin
+            if ($request->has('magasins')) {
+                foreach ($request->magasins as $magasinData) {
+                    // Vérifiez si le magasin existe déjà
+                    $magasin = Magasins::where('nom', $magasinData['nom'])
+                        ->where('adresse', $magasinData['adresse'])
+                        ->where('ville', $magasinData['ville'])
+                        ->where('code_postal', $magasinData['code_postal'])
+                        ->where('responsable', $magasinData['responsable'])
+                        ->where('telephone', $magasinData['telephone'])
+                        ->first();
 
-         // Récupération du produit à mettre à jour
-         $produit = Produits::findOrFail($id);
+                    if (!$magasin) {
+                        // Le magasin n'existe pas encore, alors créez-le
+                        $magasin = Magasins::create([
+                            'nom' => $magasinData['nom'],
+                            'adresse' => $magasinData['adresse'],
+                            'ville' => $magasinData['ville'],
+                            'code_postal' => $magasinData['code_postal'],
+                            'responsable' => $magasinData['responsable'],
+                            'telephone' => $magasinData['telephone']
+                        ]);
+                    }
 
-         // Mise à jour des champs du produit si présents dans la requête
-         $produit->fill($request->all());
-         $produit->save();
+                    // Pour chaque couleur, taille et quantité associée à ce magasin
+                    foreach ($magasinData['couleurs'] as $index => $couleur) {
+                        // Vérifiez et créez la couleur si elle n'existe pas déjà
+                        $nouvelleCouleur = Couleurs::firstOrCreate(['nom' => $couleur]);
 
-         // Traitement des images
+                        // Vérifiez et créez la taille si elle n'existe pas déjà
+                        $nouvelleTaille = Tailles::firstOrCreate(['nom' => $magasinData['tailles'][$index]]);
 
-         // Traitement de la vidéo
-         if ($request->hasFile('image_url')) {
-             $video = $request->file('image_url');
-             $videoName = $video->getClientOriginalName();
-             $video->storeAs('public/videos', $videoName); // Stockage de la vidéo dans le dossier "storage/app/public/videos"
-             $produit->image_url = Storage::url('videos/' . $videoName); // Assurez-vous d'ajuster cela selon votre modèle
-             $produit->save();
-         }
+                        // Créez une nouvelle quantité disponible pour ce produit, cette couleur, cette taille et ce magasin
+                        $quantite = new Quantitedisponible();
+                        $quantite->magasin_id = $magasin->id;
+                        $quantite->produits_id = $produit->id;
+                        $quantite->couleurs_id = $nouvelleCouleur->id;
+                        $quantite->tailles_id = $nouvelleTaille->id;
+                        $quantite->quantite = $magasinData['quantites'][$index];
+                        $quantite->save();
+                    }
+                }
+            }
 
-         if ($request->hasFile('images')) {
-             $image = $request->file('images');
-             foreach ($request->file('images') as $imageFile) {
-                 $imageName = $imageFile->getClientOriginalName();
-                 $imageFile->storeAs('public/images', $imageName); // Stockage de l'image dans le dossier "storage/app/public/images"
-
-                 // Création de l'enregistrement d'image dans la table images
-                 $image = new images();
-                 $image->chemin_image = 'public/images/' . $imageName; // Chemin d'accès relatif à l'image
-                 $image->produit_id = $produit->id; // ID du produit associé à cette image
-                 $image->save();
-             }
-         }
-
-         // Pour chaque magasin
-         if ($request->has('magasins')) {
-             foreach ($request->magasins as $magasinData) {
-                 // Vérifiez si le magasin existe déjà
-                 $magasin = Magasins::where('nom', $magasinData['nom'])
-                     ->where('adresse', $magasinData['adresse'])
-                     ->where('ville', $magasinData['ville'])
-                     ->where('code_postal', $magasinData['code_postal'])
-                     ->where('responsable', $magasinData['responsable'])
-                     ->where('telephone', $magasinData['telephone'])
-                     ->first();
-
-                 if (!$magasin) {
-                     // Le magasin n'existe pas encore, alors créez-le
-                     $magasin = Magasins::create([
-                         'nom' => $magasinData['nom'],
-                         'adresse' => $magasinData['adresse'],
-                         'ville' => $magasinData['ville'],
-                         'code_postal' => $magasinData['code_postal'],
-                         'responsable' => $magasinData['responsable'],
-                         'telephone' => $magasinData['telephone']
-                     ]);
-                 }
-
-                 // Pour chaque couleur, taille et quantité associée à ce magasin
-                 foreach ($magasinData['couleurs'] as $index => $couleur) {
-                     // Vérifiez et créez la couleur si elle n'existe pas déjà
-                     $nouvelleCouleur = Couleurs::firstOrCreate(['nom' => $couleur]);
-
-                     // Vérifiez et créez la taille si elle n'existe pas déjà
-                     $nouvelleTaille = Tailles::firstOrCreate(['nom' => $magasinData['tailles'][$index]]);
-
-                     // Créez une nouvelle quantité disponible pour ce produit, cette couleur, cette taille et ce magasin
-                     $quantite = new Quantite_disponible();
-                     $quantite->magasin_id = $magasin->id;
-                     $quantite->produits_id = $produit->id;
-                     $quantite->couleurs_id = $nouvelleCouleur->id;
-                     $quantite->tailles_id = $nouvelleTaille->id;
-                     $quantite->quantite = $magasinData['quantites'][$index];
-                     $quantite->save();
-                 }
-             }
-         }
-
-         // Redirection vers une page de succès ou d'accueil
-         return response()->json(['message' => 'Produit mis à jour avec succès', 'produit' => $produit], 200);
-     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
-         // Le produit avec l'ID spécifié n'existe pas
-         return response()->json(['error' => 'Produit non trouvé'], 404);
-     } catch (\Illuminate\Validation\ValidationException $e) {
-         // Gérer l'erreur de validation
-         return response()->json(['error' => $e->validator->errors()], 400);
-     } catch (\Exception $e) {
-         // Gérer toute autre exception
-         return response()->json(['error' => $e->getMessage()], 500);
-     }
- }
-
-
+            // Redirection vers une page de succès ou d'accueil
+            return response()->json(['message' => 'Produit mis à jour avec succès', 'produit' => $produit], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $ex) {
+            // Le produit avec l'ID spécifié n'existe pas
+            return response()->json(['error' => 'Produit non trouvé'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Gérer l'erreur de validation
+            return response()->json(['error' => $e->validator->errors()], 400);
+        } catch (\Exception $e) {
+            // Gérer toute autre exception
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 
  public function supprimerProduit($id)
  {
@@ -528,12 +520,12 @@ public function index(Request $request)
 {
     $query = Produits::query();
 
-    if ($request->has('category')) {
-        $query->filterByCategory($request->input('category'));
+    if ($request->has('categories')) {
+        $query->filterByCategory($request->input('categories'));
     }
 
-    if ($request->has('sous_categorie')) {
-        $query->searchBySousCategorie($request->input('sous_categorie'));
+    if ($request->has('souscategories')) {
+        $query->searchBySousCategorie($request->input('souscategories'));
     }
 
     if ($request->has('genre')) {

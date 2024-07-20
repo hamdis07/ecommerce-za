@@ -97,5 +97,10 @@ public function scopeFilterByKeyword($query, $keyword)
 {
     return $query->where('mots_cles', 'like', '%' . $keyword . '%');
 }
+public function commandes()
+{
+    return $this->belongsToMany(Commandes::class, 'commandesproduits')
+                ->withPivot('quantite', 'taille', 'couleur', 'prix_total');
+}
 
 }

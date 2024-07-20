@@ -1,5 +1,5 @@
 <?php
-
+use App\Http\Middleware\JWTMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -19,17 +19,39 @@ use App\Http\Controllers\PublicitesController;
 use App\Http\Controllers\DashBoardController;
 
 
+
+// Routes pour l'affichage des produits
+Route::get('/produits/afficherTousLesProduits', [ProduitsController::class, 'afficherTousLesProduits']);
+Route::get('/produits/categorie/{categorieId}', [ProduitsController::class, 'produitParCategorie']);
+Route::get('/produits/genre/{genreId}', [ProduitsController::class, 'produitsParGenre']);
+Route::get('/produits/genre/{genreId}/categorie/{categorieId}', [ProduitsController::class, 'produitsParGenreEtCategorie']);
+Route::get('/nouveaux-produits', [ProduitsController::class, 'nouveauxProduits']);
+Route::get('/produits/sous-categorie/{sousCategorieId}', [ProduitsController::class, 'searchBySousCategorie']);
+Route::get('/produits/produitsParMotCle', [ProduitsController::class, 'produitsParMotCle']);
+Route::get('/produits/recherche', [ProduitsController::class, 'index']);
+
+
+Route::post('/registre', [AuthController::class, 'registre'])->withoutMiddleware(JWTMiddleware::class);
+Route::post('/login', [AuthController::class, 'login'])->withoutMiddleware(JWTMiddleware::class);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->withoutMiddleware(JWTMiddleware::class);
+
+//Route::post('nouveauproduit', [ProduitsController::class, 'nouveauProduit']);
+//Route::post('/panier/ajouter/{produitId}', [PaniersController::class, 'ajouterAuPaniers']);
+
 Route::group([
 
     'middleware' => JWTMiddleware::class,
     'prefix' => 'auth'
 
-], function ($router) {
+], function () {
 
-    Route::post('login', 'AuthController@login');
-    Route::post('logout', 'AuthController@logout');
-    Route::post('refresh', 'AuthController@refresh');
-    Route::post('me', 'AuthController@me');
+    //Route::post('registre', [App\Http\Controllers\AuthController::class,'registre']);
+    // Route::post(' forgotPassword', [App\Http\Controllers\AuthController::class,' forgotPassword']);
+
+  //  Route::post('login', [App\Http\Controllers\AuthController::class,'login']);
+    Route::post('logout',  [App\Http\Controllers\AuthController::class,'logout']);
+    Route::post('refresh', [App\Http\Controllers\AuthController::class,'refresh']);
+    Route::post('me',  [App\Http\Controllers\AuthController::class,'me']);
 
 //coteé client
 
@@ -38,19 +60,13 @@ Route::put('/panier/mettre-a-jour/{produitId}', [PaniersController::class, 'mett
 Route::delete('/panier/retirer/{produitId}', [PaniersController::class, 'retirerDuPanier']);
 
 
-// Routes pour l'affichage des produits
-Route::get('/produits', [ProduitsController::class, 'afficherTousLesProduits']);
-Route::get('/produits/categorie/{categorieId}', [ProduitsController::class, 'produitParCategorie']);
-Route::get('/produits/genre/{genreId}', [ProduitsController::class, 'produitsParGenre']);
-Route::get('/produits/genre/{genreId}/categorie/{categorieId}', [ProduitsController::class, 'produitsParGenreEtCategorie']);
-Route::get('/nouveaux-produits', [ProduitsController::class, 'nouveauxProduits']);
-Route::get('/produits/sous-categorie/{sousCategorieId}', [ProduitsController::class, 'searchBySousCategorie']);
-Route::post('/produits/mots-cles', [ProduitsController::class, 'produitsParMotCle']);
-Route::get('/produits/recherche', [ProduitsController::class, 'index']);
-
 
 Route::middleware('auth:api')->group(function () {
-    Route::post('/commandi', [CommandesController::class, 'commandi']);
+    Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
+
+    Route::post('/commander', [CommandesController::class, 'commandi']);
+   // Route::post('/passercommande', [CommandesController::class, 'passercommande']);
+
 });
 Route::middleware('auth:api')->group(function () {
    Route::post('/messages/store', [MessageriesController::class, 'store']);
@@ -61,7 +77,7 @@ Route::middleware('auth:api')->group(function () {
 
 Route::group(['middleware' => ['auth']], function () {
     Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
-    Route::put('/admin/update/{id}', [SuperAdminController::class, 'updateadmin']);
+    Route::put('/admin/update/{id}', [App\Http\Controllers\SuperAdminController::class, 'updateadmin']);
     Route::delete('/admin/delete/{id}', [SuperAdminController::class, 'deleteUser']);
     Route::get('/admin/show/{id}', [SuperAdminController::class, 'showadmin']);
     Route::post('/admin/search/username', [SuperAdminController::class, 'searchByUsernameadmin']);
@@ -111,9 +127,9 @@ Route::put('/promos/{id}', [PromosController::class, 'update']);
 Route::delete('/promos/{id}', [PromosController::class, 'destroy']);
 //
 Route::get('/publicites', [PublicitesController::class, 'index']);
-Route::post('/publicites', [PublicitesController::class, 'store']);
+Route::post('/publicites/create', [PublicitesController::class, 'store']);
 Route::get('/publicites/{id}', [PublicitesController::class, 'show']);
-Route::put('/publicites/{id}', [PublicitesController::class, 'update']);
+Route::post('/publicites/update/{id}', [PublicitesController::class, 'update']);
 Route::delete('/publicites/{id}', [PublicitesController::class, 'destroy']);
 
 Route::middleware('auth')->group(function () {

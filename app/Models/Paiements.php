@@ -10,7 +10,7 @@ class Paiements extends Model
     use HasFactory;
     protected $table='paiements';
     protected $fillable = ['user_id',
-        'commandesss_id', 'livraisondetails_id', 'methode_paiement', 'numero_carte', 'nom_detenteur_carte',
+        'commandes_id', 'livraisondetails_id', 'methode_paiement', 'numero_carte', 'nom_detenteur_carte',
         'mois_validite', 'annee_validite', 'code_secret', 'adresse_facturation',
          'prix_total'
     ];

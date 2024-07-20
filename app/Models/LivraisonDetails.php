@@ -10,7 +10,7 @@ class LivraisonDetails extends Model
     use HasFactory;
     protected $table='livraisondetails';
     protected $fillable = [
-        'user_id', 'commandesss_id', 'adresse', 'ville', 'code_postal','description','telephone'
+        'user_id', 'commandes_id', 'adresse', 'ville', 'code_postal','description','telephone'
         // Ajoutez d'autres attributs au besoin
     ];
 
@@ -21,9 +21,9 @@ class LivraisonDetails extends Model
     }
 
     // Relation avec la commande
-    public function commandess()
+    public function commande()
     {
-        return $this->belongsTo(Commandesss::class);
+        return $this->belongsTo(Commandes::class,'commandes_id')->withDefault();
     }
 
 }

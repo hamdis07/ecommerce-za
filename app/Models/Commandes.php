@@ -9,7 +9,7 @@ class Commandes extends Model
 {
     use HasFactory;
 
-    protected $table='commandesss';
+    protected $table='commandes';
     protected $fillable = [
         'user_id', 'panier_id','monatant_total', 'statut','paiement_id','methode_paiement'
     ];
@@ -37,7 +37,7 @@ class Commandes extends Model
     {
         $montantTotal = 0;
 
-        foreach ($this->panneaux->elements as $element) {
+        foreach ($this->paniers->elements as $element) {
             $montantTotal += $element->prix_total();
         }
 

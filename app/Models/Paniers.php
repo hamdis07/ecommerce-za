@@ -9,7 +9,7 @@ class Paniers extends Model
 {
     use HasFactory;
     protected $table='paniers';
-    protected $fillable = ['panneaux_id','user_id','produit_id','quantite','taille','couleur','prix_total'];
+    protected $fillable = ['panier_id','user_id','produit_id','quantite','taille','couleur','prix_total'];
 
     public function user()
     {
@@ -18,7 +18,7 @@ class Paniers extends Model
 
     public function produits()
     {
-        return $this->belongsToMany(Produits::class, 'paniersproduits','panneaux_id', 'produit_id')
+        return $this->belongsToMany(Produits::class, 'paniersproduits','panier_id', 'produit_id')
 
 
                     ->withPivot('quantite', 'taille', 'couleur','prix_total');
@@ -37,6 +37,6 @@ class Paniers extends Model
     }
     public function commandes()
     {
-        return $this->belongsTo(Commandesss::class); // Un panneau appartient à une commande
+        return $this->belongsTo(Commandes::class); // Un panneau appartient à une commande
     }
 }

@@ -26,7 +26,7 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'genre',
             'date_de_naissance',
-            'Addresse',
+            'addresse',
            'occupation',
           'etat_social',
            'numero_telephone',
@@ -66,6 +66,7 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->getKey();
     }
+    
 
     /**
      * Return a key value array, containing any custom claims to be added to the JWT.
