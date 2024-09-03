@@ -74,8 +74,10 @@ Route::group([
 
 
     //paniercontroller
+    Route::get('/panier/consulterPanier', [PaniersController::class, 'consulterPanier']);
+
     Route::post('/panier/ajouter/{produitId}', [PaniersController::class, 'ajouterAuPaniers']);
-    Route::put('/panier/mettre-a-jour/{produitId}', [PaniersController::class, 'mettreAJourPanier']);
+    Route::post('/panier/mettre-a-jour/{produitId}', [PaniersController::class, 'mettreAJourPanier']);
     Route::delete('/panier/retirer/{produitId}', [PaniersController::class, 'retirerDuPanier']);
 
 
@@ -83,12 +85,12 @@ Route::group([
     Route::get('/fraislivraison', [CommandesController::class, 'obtenirFraisLivraison']);
 
     Route::post('/commander', [CommandesController::class, 'commander']);
-    Route::get('/commandes/{commandeId}/detailscommande', [CommandesController::class, 'voirDetailsCommande']);
+    Route::get('/commandes/detailscommande', [CommandesController::class, 'voirDetailsCommande']);
 
 //message controller
     Route::get('/messages/{id}', [MessageEnvoyerController::class, 'showMessage']);
     Route::post('/messages/{idMessage}/reply', [MessageEnvoyerController::class, 'replyToMessage']);
-    Route::delete('/messages/{id}', [MessageEnvoyerController::class, 'deleteMessage']);
+   // Route::delete('/messages/{id}', [MessageEnvoyerController::class, 'deleteMessage']);
     Route::post('/messages/contact-admin', [MessageEnvoyerController::class, 'contactAdmin']);
 
 });

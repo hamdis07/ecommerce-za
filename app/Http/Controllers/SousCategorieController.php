@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\categories;
 use App\Models\sous_categories;
+use App\Models\souscategories;
 
 use Illuminate\Support\Facades\Auth;
 

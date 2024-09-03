@@ -228,50 +228,52 @@ class MessageEnvoyerController extends Controller
         return response()->json('Message envoyé aux clients avec succès.', 200);
     }
 
-    // Contacter l'admin
     public function contactAdmin(Request $request)
-    {
-        $request->validate([
-            'content' => 'required|string',
-            'files.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
-        ]);
+{
+    $request->validate([
+        'content' => 'required|string',
+        'files.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
+    ]);
 
-        $user = Auth::user();
+    $user = Auth::user();
 
-        if (!$user) {
-            return response()->json(['message' => 'Non autorisé'], 401);
-        }
-
-        if ($user->status === 'blocked') {
-            return response()->json(['message' => 'Votre compte est bloqué. Vous ne pouvez pas contacter l\'admin.'], 403);
-        }
-
-        // Créer un nouveau message pour contacter l'admin
-        $message = new Messagerie([
-            'user_id' => $user->id,
-            'objet' => 'Contact Admin', // Définir un objet approprié
-            'nom' => $user->nom,
-            'prenom' => $user->prenom,
-            'telephone' => $user->numero_telephone,
-            'email' => $user->email,
-            'sujet' => 'Contact', // Définir si nécessaire
-            'description' => $request->content,
-        ]);
-
-        // Gérer les fichiers joints
-        if ($request->hasFile('files')) {
-            $filePaths = [];
-            foreach ($request->file('files') as $file) {
-                $filePaths[] = $file->store('messages', 'public');
-            }
-            $message->attachments = json_encode($filePaths);
-        }
-
-        $message->save();
-        return response()->json('Message envoyé à l\'admin avec succès.', 200);
+    if (!$user) {
+        return response()->json(['message' => 'Non autorisé'], 401);
     }
 
-    // Bloquer un utilisateur
+    if ($user->status === 'blocked') {
+        return response()->json(['message' => 'Votre compte est bloqué. Vous ne pouvez pas contacter l\'admin.'], 403);
+    }
+
+    // Créer un nouveau message pour contacter l'admin
+    $message = new Messagerie([
+        'user_id' => $user->id,
+        'objet' => 'Contact Admin',
+        'nom' => $user->nom,
+        'prenom' => $user->prenom,
+        'telephone' => $user->numero_telephone,
+        'email' => $user->email,
+        'sujet' => 'Contact',
+        'description' => $request->content,
+    ]);
+
+    // Gérer les fichiers joints
+    if ($request->hasFile('files')) {
+        $filePaths = [];
+        foreach ($request->file('files') as $file) {
+            // Enregistrer le fichier et récupérer son chemin
+            $path = $file->store('messages', 'public');
+            $filePaths[] = $path;
+        }
+        // Convertir les chemins des fichiers en JSON
+        $message->attachments = json_encode($filePaths);
+    }
+
+    $message->save();
+
+    return response()->json('Message envoyé à l\'admin avec succès.', 200);
+}
+
     public function blockUser($userId)
     {     $user = Auth::user();
         $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];

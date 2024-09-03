@@ -10,15 +10,7 @@ use Illuminate\Http\Request;
 
 class GenresController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('role:admin|superadmin|dispatcheur|operateur|responsable_marketing')->only([
-            ' store',
-            'update',
-            'destroy',
-
-        ]);
-    }
+   
     // Afficher tous les genres
     public function index()
     {

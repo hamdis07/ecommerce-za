@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
+use App\Models\commandes;
+use App\Models\commandesproduit;
 
 use App\Models\Produits;
 use App\Models\Categories;
@@ -536,9 +538,9 @@ public function produitsEnPromotions()
 }
 public function produitsLesPlusCommandes()
 {
-    $produits = Produits::select('produits.*', \DB::raw('COUNT(commandesproduits.produit_id) as total_commandes'))
-        ->join('commandesproduits', 'produits.id', '=', 'commandesproduits.produit_id')
-        ->groupBy('produits.id')
+    $produits = Produits::select('produits.id', 'produits.nom_produit', \DB::raw('COUNT(commandesproduits.produits_id) as total_commandes'))
+        ->join('commandesproduits', 'produits.id', '=', 'commandesproduits.produits_id')
+        ->groupBy('produits.id', 'produits.nom_produit') // Ajoutez ici les colonnes non agrégées
         ->orderBy('total_commandes', 'desc')
         ->with('commandes')
         ->get();
@@ -553,6 +555,8 @@ public function produitsLesPlusCommandes()
 
     return response()->json(['produits_les_plus_commandes' => $result], 200);
 }
+
+
 
 
 public function searchBySousCategorie($sousCategorieId)
@@ -867,7 +871,7 @@ private function isPromoDataValid($promoData)
            is_numeric($promoData['pourcentage_reduction']) &&
            $promoData['pourcentage_reduction'] > 0 && $promoData['pourcentage_reduction'] <= 100 && // Vérification du pourcentage
            strtotime($promoData['date_debut']) &&
-           strtotime($promoData['date_fin']); 
+           strtotime($promoData['date_fin']);
 }
 
 public function featureProduct($idProduit)

@@ -19,6 +19,7 @@ protected $table="messageries";
         'sujet',
         'description',
         'read',
+        'attachments',
     ];
     protected $casts = [
         'read' => 'boolean',

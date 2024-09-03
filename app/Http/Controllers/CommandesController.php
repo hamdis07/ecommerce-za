@@ -473,7 +473,7 @@ class CommandesController extends Controller
         return response()->json(['message' => 'Le statut de la commande a été mis à jour avec succès.', 'commande' => $commande], 200);
     }
 
-    public function voirDetailsCommande($commandeId)
+    public function voirDetailsCommande()
     {
         $user = Auth::user();
 
@@ -482,18 +482,23 @@ class CommandesController extends Controller
             return response()->json(['message' => 'Vous devez être connecté pour voir les détails de votre commande'], 401);
         }
 
-        // Récupérer la commande en fonction de l'ID et vérifier si elle appartient à l'utilisateur
+        // Récupérer l'ID de la commande associée à l'utilisateur connecté
+        $commandeId = Commandes::where('user_id', $user->id)->pluck('id')->first();
+
+        if (!$commandeId) {
+            return response()->json(['message' => 'Aucune commande trouvée pour cet utilisateur'], 404);
+        }
+
+        // Récupérer la commande en fonction de l'ID et charger les relations nécessaires
         $commande = Commandes::where('id', $commandeId)
-            ->where('user_id', $user->id)
             ->with(['produits', 'livraisondetails', 'paiement']) // Charger les relations nécessaires
             ->first();
 
-        if (!$commande) {
-            return response()->json(['message' => 'Commande non trouvée ou vous n\'avez pas accès à cette commande'], 404);
-        }
-
         return response()->json(['commande' => $commande], 200);
     }
+
+
+
     public function voirDetailsCommandepouradmin($commandeId)
     {
         $user = Auth::user();
