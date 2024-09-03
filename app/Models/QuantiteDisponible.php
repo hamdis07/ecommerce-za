@@ -12,23 +12,25 @@ class QuantiteDisponible extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['produits_id', 'tailles_id', 'couleurs_id', 'quantite','magasin_id'];
+    protected $fillable = ['produits_id', 'tailles_id', 'couleurs_id', 'quantite', 'magasin_id'];
 
     public function magasin()
     {
-        return $this->belongsTo(magasins::class, 'magasin_id');
+        return $this->belongsTo(Magasins::class, 'magasin_id');
     }
 
     public function produits()
     {
         return $this->belongsTo(Produits::class, 'produits_id');
     }
-     public function tailles()
+
+    public function tailles()
     {
-        return $this->belongsTo(tailles::class, 'tailles_id');
+        return $this->belongsTo(Tailles::class, 'tailles_id');
     }
+
     public function couleurs()
     {
-        return $this->belongsTo(couleurs::class, 'couleurs_id');
+        return $this->belongsTo(Couleurs::class, 'couleurs_id');
     }
 }

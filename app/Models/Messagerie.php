@@ -18,10 +18,17 @@ protected $table="messageries";
         'email',
         'sujet',
         'description',
+        'read',
     ];
-
+    protected $casts = [
+        'read' => 'boolean',
+    ];
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+    public function messagesEnvoyes()
+    {
+        return $this->hasMany(MessageEnvoyer::class);
     }
 }

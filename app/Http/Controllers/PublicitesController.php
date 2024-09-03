@@ -5,12 +5,21 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Publicites;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class PublicitesController extends Controller
 {
-    // Méthode pour créer une nouvelle bannière publicitaire
+
+
     public function store(Request $request)
     {
+        $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $rules = [
             'nom' => 'required|string',
             'detail' => 'nullable|string',
@@ -28,7 +37,6 @@ class PublicitesController extends Controller
             return response()->json(['error' => 'Erreur de validation', 'messages' => $validator->errors()], 422);
         }
 
-        // Affiche les données reçues
         //dd($request->all());
 
         $validatedData = $validator->validated();
@@ -90,7 +98,12 @@ class PublicitesController extends Controller
     }
 
     public function destroy($id)
-    {
+    {   $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         try {
             $banniere = Publicites::findOrFail($id);
             $banniere->delete();
@@ -100,9 +113,13 @@ class PublicitesController extends Controller
         }
     }
 
-    // Méthode pour mettre à jour une bannière publicitaire
     public function update(Request $request, $id)
-    {
+    {   $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         try {
             $banniere = Publicites::findOrFail($id);
         } catch (\Exception $e) {

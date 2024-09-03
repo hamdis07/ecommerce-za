@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('occupation');
             $table->string('etat_social');
             $table->string('numero_telephone');
-            $table->string('user_image');
+            $table->string('user_image')->nullable;
 
             $table->string('user_name')->unique();
 

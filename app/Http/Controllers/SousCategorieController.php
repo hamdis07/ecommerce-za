@@ -6,11 +6,19 @@ use Illuminate\Http\Request;
 use App\Models\categories;
 use App\Models\sous_categories;
 
+use Illuminate\Support\Facades\Auth;
 
 class SousCategorieController extends Controller
 {
+
+
     public function store(Request $request)
-{
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
     $request->validate([
         'nom' => 'required|string',
         'categorie_id' => 'nullable|exists:categories,id',
@@ -18,9 +26,7 @@ class SousCategorieController extends Controller
 
     $categorieId = $request->input('categorie_id');
 
-    // Vérifier si la catégorie existe
     if ($categorieId && !Categories::find($categorieId)) {
-        // Si la catégorie n'existe pas, créer une nouvelle catégorie
         $categorie = Categories::create(['nom' => 'Nouvelle catégorie']);
         $categorieId = $categorie->id;
     }
@@ -33,7 +39,12 @@ class SousCategorieController extends Controller
     return response()->json($sousCategorie, 201);
 }
 public function update(Request $request, $id)
-{
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
     $request->validate([
         'nom' => 'required|string',
         'categorie_id' => 'nullable|exists:categories,id',
@@ -41,9 +52,7 @@ public function update(Request $request, $id)
 
     $categorieId = $request->input('categorie_id');
 
-    // Vérifier si la catégorie existe
     if ($categorieId && !Categories::find($categorieId)) {
-        // Si la catégorie n'existe pas, créer une nouvelle catégorie
         $categorie = Categories::create(['nom' => 'Nouvelle catégorie']);
         $categorieId = $categorie->id;
     }
@@ -62,14 +71,18 @@ public function index()
     return response()->json($sousCategories);
 }
 
-// Afficher une seule sous-catégorie
 public function show($id)
 {
     $sousCategorie = SousCategories::findOrFail($id);
     return response()->json($sousCategorie);
 }
 public function destroy($id)
-{
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
     SousCategories::findOrFail($id)->delete();
     return response()->json(null, 204);
 }

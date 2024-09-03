@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use Illuminate\Support\Facades\Auth;
 
 use App\Models\Commandes;
 use App\Models\Produits;
@@ -11,8 +12,12 @@ class DashboardController extends Controller
 {
     public function stats()
     {
-        // Calculer le revenu total
-        $totalRevenue = Commandes::join('commandesproduits', 'commandes.id', '=', 'commandesproduits.commandes_id')
+        $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }        $totalRevenue = Commandes::join('commandesproduits', 'commandes.id', '=', 'commandesproduits.commandes_id')
             ->sum('commandesproduits.prix_total');
 
         // Obtenir les visites quotidiennes (en supposant que 'created_at' est la date d'inscription)

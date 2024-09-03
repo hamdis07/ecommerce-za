@@ -18,25 +18,44 @@ use App\Http\Controllers\PublicitesController;
 
 use App\Http\Controllers\DashBoardController;
 
-
-
-// Routes pour l'affichage des produits
-Route::get('/produits/afficherTousLesProduits', [ProduitsController::class, 'afficherTousLesProduits']);
-Route::get('/produits/categorie/{categorieId}', [ProduitsController::class, 'produitParCategorie']);
-Route::get('/produits/genre/{genreId}', [ProduitsController::class, 'produitsParGenre']);
-Route::get('/produits/genre/{genreId}/categorie/{categorieId}', [ProduitsController::class, 'produitsParGenreEtCategorie']);
-Route::get('/nouveaux-produits', [ProduitsController::class, 'nouveauxProduits']);
-Route::get('/produits/sous-categorie/{sousCategorieId}', [ProduitsController::class, 'searchBySousCategorie']);
-Route::get('/produits/produitsParMotCle', [ProduitsController::class, 'produitsParMotCle']);
-Route::get('/produits/recherche', [ProduitsController::class, 'index']);
-
+//route public
 
 Route::post('/registre', [AuthController::class, 'registre'])->withoutMiddleware(JWTMiddleware::class);
 Route::post('/login', [AuthController::class, 'login'])->withoutMiddleware(JWTMiddleware::class);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->withoutMiddleware(JWTMiddleware::class);
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->withoutMiddleware(JWTMiddleware::class);
 
-//Route::post('nouveauproduit', [ProduitsController::class, 'nouveauProduit']);
-//Route::post('/panier/ajouter/{produitId}', [PaniersController::class, 'ajouterAuPaniers']);
+Route::get('/reset-password/{token}', function ($token) {
+})->name('password.reset');
+
+
+Route::get('/sous-categories/{id}', [SousCategorieController::class, 'show']);
+Route::get('/sous-categories', [SousCategorieController::class, 'index']);
+Route::get('/genres/{id}', [GenresController::class, 'show']);
+Route::get('/genres', [GenresController::class, 'index']);
+Route::get('categories', [CategoriesController::class, 'index']);
+Route::get('categories/{id}', [CategoriesController::class, 'show']);
+
+Route::get('/produits/produits/{id}', [ProduitsController::class, 'getProduitById']);
+Route::get('/produits/genre/{genreId}', [ProduitsController::class, 'produitsParGenre']);
+Route::get('/produits/recherche', [ProduitsController::class, 'index']);
+
+Route::get('/produits/accueil', [ProduitsController::class, 'afficherTousLesProduitspageclient']);
+Route::get('/produits/categorie/{categorieId}', [ProduitsController::class, 'produitParCategorie']);
+Route::get('/produits/produitsParMotCle', [ProduitsController::class, 'produitsParMotCle']);
+Route::get('/produits/nouveaux-produits', [ProduitsController::class, 'nouveauxProduits']);
+Route::get('/produits/genre/{genreId}/categorie/{categorieId}', [ProduitsController::class, 'produitsParGenreEtCategorie']);
+Route::get('/produits/sous-categorie/{sousCategorieId}', [ProduitsController::class, 'searchBySousCategorie']);
+Route::get('/produits/promotions', [ProduitsController::class, 'produitsEnPromotions']);
+Route::get('/produits/les-plus-commandes', [ProduitsController::class, 'produitsLesPlusCommandes']);
+
+
+
+Route::get('/publicites/{id}', [PublicitesController::class, 'show']);
+
+Route::get('/publicites', [PublicitesController::class, 'index']);
+
+//route prive quote client ;
 
 Route::group([
 
@@ -45,101 +64,149 @@ Route::group([
 
 ], function () {
 
-    //Route::post('registre', [App\Http\Controllers\AuthController::class,'registre']);
-    // Route::post(' forgotPassword', [App\Http\Controllers\AuthController::class,' forgotPassword']);
-
-  //  Route::post('login', [App\Http\Controllers\AuthController::class,'login']);
-    Route::post('logout',  [App\Http\Controllers\AuthController::class,'logout']);
-    Route::post('refresh', [App\Http\Controllers\AuthController::class,'refresh']);
-    Route::post('me',  [App\Http\Controllers\AuthController::class,'me']);
-
-//coteé client
-
-Route::post('/panier/ajouter/{produitId}', [PaniersController::class, 'ajouterAuPaniers']);
-Route::put('/panier/mettre-a-jour/{produitId}', [PaniersController::class, 'mettreAJourPanier']);
-Route::delete('/panier/retirer/{produitId}', [PaniersController::class, 'retirerDuPanier']);
+    Route::middleware('auth:api')->group(function () {
+    Route::get('me', [AuthController::class, 'me']);
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
+    Route::get('consulter-coordonnees', [AuthController::class, 'consulterCoordonnees']);
+    Route::post('modifier-coordonnees', [AuthController::class, 'modifierCoordonnees']);
+    Route::get('historiquedachat', [AuthController::class, 'historiquedachat']);
 
 
+    //paniercontroller
+    Route::post('/panier/ajouter/{produitId}', [PaniersController::class, 'ajouterAuPaniers']);
+    Route::put('/panier/mettre-a-jour/{produitId}', [PaniersController::class, 'mettreAJourPanier']);
+    Route::delete('/panier/retirer/{produitId}', [PaniersController::class, 'retirerDuPanier']);
 
-Route::middleware('auth:api')->group(function () {
-    Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
 
-    Route::post('/commander', [CommandesController::class, 'commandi']);
-   // Route::post('/passercommande', [CommandesController::class, 'passercommande']);
+//commandes controller
+    Route::get('/fraislivraison', [CommandesController::class, 'obtenirFraisLivraison']);
+
+    Route::post('/commander', [CommandesController::class, 'commander']);
+    Route::get('/commandes/{commandeId}/detailscommande', [CommandesController::class, 'voirDetailsCommande']);
+
+//message controller
+    Route::get('/messages/{id}', [MessageEnvoyerController::class, 'showMessage']);
+    Route::post('/messages/{idMessage}/reply', [MessageEnvoyerController::class, 'replyToMessage']);
+    Route::delete('/messages/{id}', [MessageEnvoyerController::class, 'deleteMessage']);
+    Route::post('/messages/contact-admin', [MessageEnvoyerController::class, 'contactAdmin']);
 
 });
+
+
+
+
+
+//cote admin
+
 Route::middleware('auth:api')->group(function () {
-   Route::post('/messages/store', [MessageriesController::class, 'store']);
+    Route::get('/dashboard', [DashboardController::class, 'stats']);
 });
 
-//coté admin
+Route::middleware('auth:api')->group(function () {
 
+      Route::post('/categories', [CategoriesController::class, 'store']);
+      Route::put('/categories/{id}', [CategoriesController::class, 'update']);
+      Route::delete('/categories/{id}', [CategoriesController::class, 'destroy']);
+
+      Route::post('/genres', [GenresController::class, 'store']);
+      Route::put('/genres/{id}', [GenresController::class, 'update']);
+      Route::delete('/genres/{id}', [GenresController::class, 'destroy']);
+
+      Route::post('/sous-categories', [SousCategorieController::class, 'store']);
+      Route::put('/sous-categories/{id}', [SousCategorieController::class, 'update']);
+      Route::delete('/sous-categories/{id}', [SousCategorieController::class, 'destroy']);
+
+      Route::post('/produits/{idProduit}/promos', [ProduitsController::class, 'ajouterPromos']);
+      Route::post('/produits/{idProduit}/promos/{idPromos}', [ProduitsController::class, 'updatePromos']);
+      Route::post('/produits/{idProduit}/promos/update-or-create', [ProduitsController::class, 'updateOrCreatePromos']);
+      Route::delete('/produits/{idProduit}/promos', [ProduitsController::class, 'removePromos']);
+      Route::post('/produits/promos/apply-to-multiple', [ProduitsController::class, 'applyPromosToMultipleProducts']);
+      Route::get('/produits/afficherTousLesProduits', [ProduitsController::class, 'afficherTousLesProduits']);
+      Route::post('/produits/{idProduit}/feature', [ProduitsController::class, 'featureProduct']);
+      Route::post('/produits/{idProduit}/unfeature', [ProduitsController::class, 'unfeatureProduct']);
+      Route::post('/produits/{idProduit}/hide', [ProduitsController::class, 'hideProduct']);
+      Route::post('/produits/{idProduit}/unhide', [ProduitsController::class, 'unhideProduct']);
+      Route::post('/produits/nouveauproduit', [ProduitsController::class, 'nouveauProduit']);
+      Route::Post('/produits/modifierleproduit/{id}', [ProduitsController::class, 'modifierProduit']);
+      Route::delete('/produits/supprimerProduit/{id}', [ProduitsController::class, 'supprimerProduit']);
+
+      Route::post('/fraislivraison/update', [CommandesController::class, 'updatefraislivraison']);
+      Route::post('/admin/commandes/{commandeId}/statut', [CommandesController::class, 'changerStatutCommande']);
+
+      Route::get('/exportcommandespdf/{id}', [CommandesController::class, 'exporterCommandePDF']);
+
+      Route::get('/export-commandes', [CommandesController::class, 'exporterCommandes']);
+      Route::get('/commandes/{commandeId}/details', [CommandesController::class, 'voirDetailsCommandepouradmin']);
+      Route::get('/commandes/details', [CommandesController::class, 'detailsCommandes']);
+
+
+
+        Route::get('messages/clients', [MessageEnvoyerController::class, 'listClients']);
+        Route::get('messages/admins', [MessageEnvoyerController::class, 'listClients']);
+        Route::get('/messages', [MessageEnvoyerController::class, 'listMessages']);
+        Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
+        Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
+        Route::post('/messages/search', [MessageEnvoyerController::class, 'searchMessages']);
+        Route::post('/messages/send-to-client/{id}', [MessageEnvoyerController::class, 'sendMessageToClient']);
+        Route::post('/users/{userId}/block', [MessageEnvoyerController::class, 'blockUser']);
+        Route::post('/users/{userId}/unblock', [MessageEnvoyerController::class, 'unblockUser']);
+
+
+
+
+        Route::post('/publicites/update/{id}', [PublicitesController::class, 'update']);
+        Route::delete('/publicites/{id}', [PublicitesController::class, 'destroy']);
+        Route::post('/publicites/create', [PublicitesController::class, 'store']);
+
+
+    });
+
+
+//superadminauth
 
 Route::group(['middleware' => ['auth']], function () {
-    Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
-    Route::put('/admin/update/{id}', [App\Http\Controllers\SuperAdminController::class, 'updateadmin']);
+   Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
+    Route::post('/admin/update/{id}', [App\Http\Controllers\SuperAdminController::class, 'updateadmin']);
     Route::delete('/admin/delete/{id}', [SuperAdminController::class, 'deleteUser']);
     Route::get('/admin/show/{id}', [SuperAdminController::class, 'showadmin']);
     Route::post('/admin/search/username', [SuperAdminController::class, 'searchByUsernameadmin']);
     Route::post('/admin/research', [SuperAdminController::class, 'rechercheradmin']);
     Route::post('/admin/get-users-by-role', [SuperAdminController::class, 'getUsersByRole']);
     Route::get('/admin/get-admins', [SuperAdminController::class, 'getAdmins']);
+    Route::patch('/admin/update-status/{id}', [SuperAdminController::class, 'updateAdminStatus']);
+
+  Route::post('/client/create', [SuperAdminController::class, 'createclient']);
+  Route::post('/client/update/{id}', [SuperAdminController::class, 'updateclient']);
+  Route::delete('/client/delete/{id}', [SuperAdminController::class, 'deleteClient']);
+  Route::get('/client/show/{id}', [SuperAdminController::class, 'showclient']);
+  Route::post('/client/search/username', [SuperAdminController::class, 'searchByUsernameclient']);
+  Route::post('/client/research', [SuperAdminController::class, 'rechercherclient']);
+  Route::get('/client/get-clients', [SuperAdminController::class, 'getClients']);
+  Route::patch('/client/update-status/{id}', [SuperAdminController::class, 'updateClientStatus']);
+
 });
 
 
 
-Route::get('/genres', [GenresController::class, 'index']);
-Route::post('/genres', [GenresController::class, 'store']);
-Route::get('/genres/{id}', [GenresController::class, 'show']);
-Route::put('/genres/{id}', [GenresController::class, 'update']);
-Route::delete('/genres/{id}', [GenresController::class, 'destroy']);
 
-//
-Route::get('/categories', [CategoriesController::class, 'index']);
-    Route::post('/categories', [CategoriesController::class, 'store']);
-    Route::get('/categories/{id}', [CategoriesController::class, 'show']);
-    Route::put('/categories/{id}', [CategoriesController::class, 'update']);
-    Route::delete('/categories/{id}', [CategoriesController::class, 'destroy']);
-//
-Route::get('/sous-categories', [SousCategorieController::class, 'index']);
-Route::post('/sous-categories', [SousCategorieController::class, 'store']);
-Route::get('/sous-categories/{id}', [SousCategorieController::class, 'show']);
-Route::put('/sous-categories/{id}', [SousCategorieController::class, 'update']);
-Route::delete('/sous-categories/{id}', [SousCategorieController::class, 'destroy']);
-
-// Route::prefix('products')->group(function () {
-    Route::post('nouveauproduit', [ProduitsController::class, 'nouveauProduit']);
-    Route::put('modifierleproduit/{id}', [ProduitsController::class, 'modifierProduit']);
-    Route::delete('/produits/{id}', [ProduitsController::class, 'supprimerProduit']);
-// });
 // Routes pour la gestion des promotions
-Route::post('/produits/{idProduit}/promos', [ProduitsController::class, 'ajouterPromos']);
-Route::put('/produits/{idProduit}/promos/{idPromos}', [ProduitsController::class, 'updatePromos']);
-Route::post('/produits/{idProduit}/promos/update-or-create', [ProduitsController::class, 'updateOrCreatePromos']);
-Route::delete('/produits/{idProduit}/promos', [ProduitsController::class, 'removePromos']);
 
 //
 
-Route::get('/promos', [PromosController::class, 'index']);
-Route::post('/promos', [PromosController::class, 'store']);
-Route::get('/promos/{id}', [PromosController::class, 'show']);
-Route::put('/promos/{id}', [PromosController::class, 'update']);
-Route::delete('/promos/{id}', [PromosController::class, 'destroy']);
-//
-Route::get('/publicites', [PublicitesController::class, 'index']);
-Route::post('/publicites/create', [PublicitesController::class, 'store']);
-Route::get('/publicites/{id}', [PublicitesController::class, 'show']);
-Route::post('/publicites/update/{id}', [PublicitesController::class, 'update']);
-Route::delete('/publicites/{id}', [PublicitesController::class, 'destroy']);
+// Route::get('/promos', [PromosController::class, 'index']);
+// Route::post('/promos', [PromosController::class, 'store']);
+// Route::get('/promos/{id}', [PromosController::class, 'show']);
+// Route::put('/promos/{id}', [PromosController::class, 'update']);
+// Route::delete('/promos/{id}', [PromosController::class, 'destroy']);
+// //
+//Route::get('/publicites', [PublicitesController::class, 'index']);
+//Route::get('/publicites/{id}', [PublicitesController::class, 'show']);
 
-Route::middleware('auth')->group(function () {
-    Route::get('/messages', [MessageEnvoyerController::class, 'listMessages']);
-    Route::get('/messages/{id}', [MessageEnvoyerController::class, 'showMessage']);
-    Route::post('/messages/reply/{idMessage}', [MessageEnvoyerController::class, 'replyToMessage']);
-    Route::delete('/messages/{id}', [MessageEnvoyerController::class, 'deleteMessage']);
-    Route::post('/users/block/{userId}', [MessageEnvoyerController::class, 'blockUser']);
+
 
 });
-Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
-});
+
+
+

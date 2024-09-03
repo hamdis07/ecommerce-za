@@ -9,11 +9,11 @@ class Produits extends Model
 {
     use HasFactory;
     protected $table='Produits';
-    protected $fillable = ['references','nom_produit', 'image_url', 'description', 'prix','prix_initial','composition',  'entretien','mots_cles'];
+    protected $fillable = ['references','nom_produit', 'image_url', 'description', 'prix','prix_initial','composition',  'entretien','mots_cles','is_featured', 'is_hidden'];
 
     public function categories()
     {
-        return $this->belongsTo(Categories::class);
+        return $this->belongsTo(Categories::class,'categorie_id');
     }
     public function tailles()
     {
@@ -26,7 +26,7 @@ class Produits extends Model
     }
     public function Genre()
     {
-        return $this->belongsTo(genre::class);
+        return $this->belongsTo(genre::class,'genre_id');
     }
     public function setMotsClesAttribute($value)
     {
@@ -38,11 +38,11 @@ class Produits extends Model
     }
     public function sousCategories()
 {
-    return $this->belongsTo(SousCategories::class,);
+    return $this->belongsTo(SousCategories::class,'souscategories_id');
 }
 public function quantitedisponible()
     {
-        return $this->belongsTo(quantitedisponible::class);
+        return $this->hasMany(quantitedisponible::class,'produits_id');
     }
 public function paniers()
 {
@@ -57,16 +57,18 @@ public function magasins()
 
 public function images()
 {
-    return $this->hasMany(images::class);
+    return $this->hasMany(Images::class, 'produit_id');
 }
 public function scopeSearchBySousCategorie($query, $sousCategorieId)
 {
-    return $query->whereHas('sous_Categories', function ($query) use ($sousCategorieId) {
+    return $query->whereHas('sousCategories', function ($query) use ($sousCategorieId) {
         $query->where('id', $sousCategorieId);
     });
-} public function scopeFilterByCategory($query, $categoryId)
+}
+
+public function scopeFilterByCategory($query, $categoryId)
 {
-    return $query->where('categories_id', $categoryId);
+    return $query->where('categorie_id', $categoryId);
 }
 
 public function scopeFilterByGenre($query, $genreId)

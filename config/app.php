@@ -2,7 +2,7 @@
 
 return [
 
-    
+
     /*
     |--------------------------------------------------------------------------
     | Application Name
@@ -66,7 +66,7 @@ return [
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
+    'timezone' => env('APP_TIMEZONE', 'Africa/Tunis'),
 
     /*
     |--------------------------------------------------------------------------
@@ -123,5 +123,11 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+'providers' => [
+    // Other Service Providers
+
+    App\Providers\PromoCommandServiceProvider::class,
+],
+
 
 ];

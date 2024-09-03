@@ -19,9 +19,9 @@ class MessageEnvoyer extends Model
     /**
      * Relation avec le message associé à cette réponse.
      */
-    public function message()
+    public function messagerie()
     {
-        return $this->belongsTo(Messageries::class);
+        return $this->belongsTo(Messagerie::class, 'message_id');
 
     }
     public function user()

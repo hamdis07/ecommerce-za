@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -11,11 +13,16 @@ use Spatie\Permission\Models\Role;
 class SuperAdminController extends Controller
 {
     public function createadministrateur(Request $request)
-    {
+    {    $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         $rules = [
             'nom' => 'required|string|max:255',
             'prenom' => 'required|string|max:255',
-            'genre' => 'required|string|in:Male,Female,Other',
+            'genre' => 'required|string|in:Male,Female,Other,femme,homme,autre',
             'date_de_naissance' => 'required|date',
             'addresse' => 'required|string|max:255',
             'occupation' => 'required|string|max:255',
@@ -25,21 +32,401 @@ class SuperAdminController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'role' => 'required|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing'
         ];
 
-        // Valider les données de la requête
+        try {
+            $validatedData = $request->validate($rules);
+
+            $imageUrl = null;
+            if ($request->hasFile('user_image')) {
+                $image = $request->file('user_image');
+                $imageName = time() . '_' . $image->getClientOriginalName();
+                $image->move(public_path('images'), $imageName);
+                $imageUrl = asset('images/' . $imageName);
+            }
+
+            $user = User::create([
+                'nom' => $validatedData['nom'],
+                'prenom' => $validatedData['prenom'],
+                'genre' => $validatedData['genre'],
+                'date_de_naissance' => $validatedData['date_de_naissance'],
+                'addresse' => $validatedData['addresse'],
+                'occupation' => $validatedData['occupation'],
+                'etat_social' => $validatedData['etat_social'],
+                'numero_telephone' => $validatedData['numero_telephone'],
+                'user_name' => $validatedData['user_name'],
+                'email' => $validatedData['email'],
+                'email_verified_at' => now(),
+                'user_image' => $imageUrl,
+                'password' => Hash::make($validatedData['password']),
+            ]);
+
+            $role = $validatedData['role'];
+            $user->assignRole($role);
+
+            return response()->json([
+                'message' => 'User created successfully.',
+                'data' => $user
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Erreur interne du serveur',
+                'errors' => $e->errors()
+            ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erreur interne du serveur',
+                'errors' => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function updateadmin(Request $request, $id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $rules = [
+        'nom' => 'sometimes|string|max:255',
+        'prenom' => 'sometimes|string|max:255',
+        'genre' => 'sometimes|string|in:Male,Female,Other,femme,homme,autre',
+        'date_de_naissance' => 'sometimes|date',
+        'addresse' => 'sometimes|string|max:255',
+        'occupation' => 'sometimes|string|max:255',
+        'etat_social' => 'sometimes|string|max:255',
+        'numero_telephone' => 'sometimes|string|max:255',
+        'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
+        'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
+        'password' => 'nullable|string|min:8',
+        'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'role' => 'sometimes|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing',
+        'status' => 'sometimes|string|in:actif,non actif,en attente,bloqué',
+    ];
+
+    try {
         $validatedData = $request->validate($rules);
 
-        // Traiter l'upload d'image si disponible
-        $imageUrl = "";
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
+        $user = User::findOrFail($id);
+
+        if ($request->hasFile('user_image')) {
+            if ($user->user_image) {
+                $oldImagePath = public_path('images') . '/' . basename($user->user_image);
+                if (file_exists($oldImagePath)) {
+                    unlink($oldImagePath);
+                }
+            }
+
+            $image = $request->file('user_image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $image->move(public_path('images'), $imageName);
+            $user->user_image = asset('images/' . $imageName);
+        }
+
+        $user->update(array_filter([
+            'nom' => $validatedData['nom'] ?? $user->nom,
+            'prenom' => $validatedData['prenom'] ?? $user->prenom,
+            'genre' => $validatedData['genre'] ?? $user->genre,
+            'date_de_naissance' => $validatedData['date_de_naissance'] ?? $user->date_de_naissance,
+            'addresse' => $validatedData['addresse'] ?? $user->addresse,
+            'occupation' => $validatedData['occupation'] ?? $user->occupation,
+            'etat_social' => $validatedData['etat_social'] ?? $user->etat_social,
+            'numero_telephone' => $validatedData['numero_telephone'] ?? $user->numero_telephone,
+            'user_name' => $validatedData['user_name'] ?? $user->user_name,
+            'email' => $validatedData['email'] ?? $user->email,
+            'status' => $validatedData['status'] ?? $user->status,
+              ]));
+
+        if (!empty($validatedData['password'])) {
+            $user->password = Hash::make($validatedData['password']);
+        }
+
+
+        if (!empty($validatedData['role'])) {
+            $user->syncRoles([$validatedData['role']]);
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'User updated successfully.',
+            'data' => $user
+        ], 200);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation error',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Erreur interne du serveur',
+            'errors' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+public function deleteUser($id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $user = User::find($id);
+
+    if (!$user) {
+        return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
+    }
+
+    $user->commandes()->update(['paiement_id' => null]);
+
+    $user->delete();
+
+    return response()->json(['message' => 'Utilisateur supprimé avec succès.']);
+}
+
+public function showadmin($id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $user = User::find($id);
+    if (!$user) {
+        return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
+    }
+    return response()->json(['user' => $user]);
+}
+
+public function searchByUsernameadmin(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $validator = Validator::make($request->all(), [
+        'user_name' => 'required|string|max:255',
+    ]);
+    if ($validator->fails()) {
+        return response()->json(['error' => $validator->errors()->first()], 400);
+    }
+    $user = User::where('user_name', $request->user_name)->first();
+    if (!$user) {
+        return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
+    }
+    return response()->json(['user' => $user]);
+}
+public function rechercheradmin(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $query = User::query();
+
+    // Filtre par statut
+   // if ($request->has('statut')) {
+   //     $query->where('statut', $request->statut);
+   // }
+
+    if ($request->has('nom')) {
+        $query->where('nom', 'like', '%' . $request->nom . '%');
+    }
+
+    if ($request->has('prenom')) {
+        $query->where('prenom', 'like', '%' . $request->prenom . '%');
+    }
+
+    if ($request->has('numero_telephone')) {
+        $query->where('numero_telephone', 'like', '%' . $request->numero_telephone . '%');
+    }
+
+    $utilisateurs = $query->get();
+
+    return response()->json($utilisateurs);
+}
+public function getUsersByRole(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    // Vérifiez si un rôle est passé dans la requête
+    $validator = Validator::make($request->all(), [
+        'role' => 'required|string|in:operateur,admin,dispatcheur,super admin,digital marketing',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json(['error' => $validator->errors()->first()], 400);
+    }
+
+    $role = Role::where('name', $request->role)->first();
+
+    if (!$role) {
+        return response()->json(['error' => 'Rôle non trouvé.'], 404);
+    }
+
+    $users = $role->users;
+
+
+    return response()->json(['users' => $users]);
+}
+
+ public function getAdmins(Request $request)
+ {   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+     $perPage = $request->input('per_page', 10); // Number of items per page
+     $sortBy = $request->input('sort_by', 'name'); // Field to sort by (default: 'name')
+     $sortOrder = $request->input('sort_order', 'asc'); // Sorting order (default: 'asc')
+
+     // Validate sorting inputs
+     if (!in_array($sortBy, ['name', 'email', 'numero_telephone', 'occupation'])) {
+         return response()->json([
+             'message' => 'Invalid sort field',
+         ], 400);
+     }
+
+     if (!in_array($sortOrder, ['asc', 'desc'])) {
+         return response()->json([
+             'message' => 'Invalid sort order',
+         ], 400);
+     }
+
+     $clientRole = Role::where('name', 'client')->first();
+
+     if (!$clientRole) {
+         return response()->json([
+             'message' => 'Client role not found',
+         ], 404);
+     }
+
+     $admins = User::whereDoesntHave('roles', function($query) use ($clientRole) {
+         $query->where('role_id', $clientRole->id);
+     })
+     ->orderBy($sortBy, $sortOrder)
+     ->paginate($perPage);
+
+     return response()->json([
+         'data' => $admins->items(),
+         'current_page' => $admins->currentPage(),
+         'total_pages' => $admins->lastPage(),
+         'total_items' => $admins->total()
+     ]);
+ }
+ public function updateAdminStatus(Request $request, $id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $rules = [
+        'status' => 'required|string|in:actif,non actif,en attente,bloqué',
+    ];
+
+    try {
+        $validatedData = $request->validate($rules);
+
+
+        $user = User::findOrFail($id);
+
+        $user->status = $validatedData['status'];
+        $user->save();
+
+        return response()->json([
+            'message' => 'Statut mis à jour avec succès.',
+            'data' => $user
+        ], 200);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Erreur de validation',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Erreur interne du serveur',
+            'errors' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+ public function getClients(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $perPage = $request->input('per_page', 10); // Number of items per page
+
+
+    $clientRole = Role::where('name', 'client')->first();
+
+    if (!$clientRole) {
+        return response()->json([
+            'message' => 'Client role not found',
+        ], 404);
+    }
+
+    $clients = User::whereHas('roles', function($query) use ($clientRole) {
+        $query->where('role_id', $clientRole->id);
+    })->paginate($perPage);
+
+    return response()->json([
+        'data' => $clients->items(),
+        'current_page' => $clients->currentPage(),
+        'total_pages' => $clients->lastPage(),
+        'total_items' => $clients->total()
+    ]);
+}
+
+
+public function createclient(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $rules = [
+        'nom' => 'required|string|max:255',
+        'prenom' => 'required|string|max:255',
+        'genre' => 'required|string|in:Male,Female,Other,femme,homme,autre',
+        'date_de_naissance' => 'required|date',
+        'addresse' => 'required|string|max:255',
+        'occupation' => 'required|string|max:255',
+        'etat_social' => 'required|string|max:255',
+        'numero_telephone' => 'required|string|max:255',
+        'user_name' => 'required|string|max:255|unique:users',
+        'email' => 'required|string|email|max:255|unique:users',
+        'password' => 'required|string|min:8',
+        'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'role' => 'required|string|in:client'
+    ];
+
+    try {
+        $validatedData = $request->validate($rules);
+
+        $imageUrl = null;
+        if ($request->hasFile('user_image')) {
+            $image = $request->file('user_image');
             $imageName = time() . '_' . $image->getClientOriginalName();
             $image->move(public_path('images'), $imageName);
             $imageUrl = asset('images/' . $imageName);
         }
 
-        // Créer un nouvel utilisateur avec les données validées
         $user = User::create([
             'nom' => $validatedData['nom'],
             'prenom' => $validatedData['prenom'],
@@ -56,169 +443,253 @@ class SuperAdminController extends Controller
             'password' => Hash::make($validatedData['password']),
         ]);
 
-        // Assigner un rôle à l'utilisateur
-        $role = Role::where('name', $request->role)->first();
-        if ($role) {
-            $user->assignRole([$role->id]);
-        }
+        $role = $validatedData['role'];
+        $user->assignRole($role);
 
-        return response()->json("Utilisateur créé avec succès");
+        return response()->json([
+            'message' => 'Client créé avec succès.',
+            'data' => $user
+        ], 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Erreur de validation',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Erreur interne du serveur',
+            'errors' => $e->getMessage()
+        ], 500);
     }
+}
 
-    public function updateadmin(Request $request, $id)
-    {
-        $rules = [
-            'nom' => 'sometimes|string|max:255',
-            'prenom' => 'sometimes|string|max:255',
-            'genre' => 'sometimes|string|in:Male,Female,Other',
-            'date_de_naissance' => 'sometimes|date',
-            'addresse' => 'sometimes|string|max:255',
-            'occupation' => 'sometimes|string|max:255',
-            'etat_social' => 'sometimes|string|max:255',
-            'numero_telephone' => 'sometimes|string|max:255',
-            'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
-            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
-            'password' => 'nullable|string|min:8',
-            'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        ];
 
-        // Valider les données de la requête
+
+public function updateclient(Request $request, $id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $rules = [
+        'nom' => 'sometimes|string|max:255',
+        'prenom' => 'sometimes|string|max:255',
+        'genre' => 'sometimes|string|in:Male,Female,Other,femme,homme,autre',
+        'date_de_naissance' => 'sometimes|date',
+        'addresse' => 'sometimes|string|max:255',
+        'occupation' => 'sometimes|string|max:255',
+        'etat_social' => 'sometimes|string|max:255',
+        'numero_telephone' => 'sometimes|string|max:255',
+        'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
+        'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
+        'password' => 'nullable|string|min:8',
+        'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'role' => 'sometimes|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing',
+        'status' => 'sometimes|string|in:actif,non actif,en attente,bloqué',
+    ];
+
+    try {
         $validatedData = $request->validate($rules);
 
-        // Récupérer l'utilisateur par son ID
         $user = User::findOrFail($id);
 
-        // Mettre à jour les données de l'utilisateur avec les données validées
-        $user->update($validatedData);
-
-        // Mettre à jour le mot de passe si fourni
-        if ($request->filled('password')) {
-            $user->password = Hash::make($request->password);
-            $user->save();
-        }
-
-        // Gérer l'upload d'image si disponible
-        $imageUrl = $user->user_image;
         if ($request->hasFile('user_image')) {
+            if ($user->user_image) {
+                $oldImagePath = public_path('images') . '/' . basename($user->user_image);
+                if (file_exists($oldImagePath)) {
+                    unlink($oldImagePath);
+                }
+            }
+
+
             $image = $request->file('user_image');
             $imageName = time() . '_' . $image->getClientOriginalName();
             $image->move(public_path('images'), $imageName);
-            $imageUrl = asset('images/' . $imageName);
+            $user->user_image = asset('images/' . $imageName);
         }
 
-        // Mettre à jour le rôle de l'utilisateur
-        if ($request->has('role')) {
-            $role = Role::where('name', $request->role)->first();
-            if ($role) {
-                $user->syncRoles([$role->id]);
-            }
+
+        $user->fill(array_filter([
+            'nom' => $validatedData['nom'] ?? $user->nom,
+            'prenom' => $validatedData['prenom'] ?? $user->prenom,
+            'genre' => $validatedData['genre'] ?? $user->genre,
+            'date_de_naissance' => $validatedData['date_de_naissance'] ?? $user->date_de_naissance,
+            'addresse' => $validatedData['addresse'] ?? $user->addresse,
+            'occupation' => $validatedData['occupation'] ?? $user->occupation,
+            'etat_social' => $validatedData['etat_social'] ?? $user->etat_social,
+            'numero_telephone' => $validatedData['numero_telephone'] ?? $user->numero_telephone,
+            'user_name' => $validatedData['user_name'] ?? $user->user_name,
+            'email' => $validatedData['email'] ?? $user->email,
+            'status' => $validatedData['status'] ?? $user->status,
+
+        ]));
+
+        if (!empty($validatedData['password'])) {
+            $user->password = Hash::make($validatedData['password']);
         }
 
-        // Mettre à jour l'URL de l'image de l'utilisateur
-        $user->user_image = $imageUrl;
+        if (!empty($validatedData['role'])) {
+
+            $user->syncRoles([$validatedData['role']]);
+        }
+
         $user->save();
 
-        return response()->json("Utilisateur mis à jour avec succès");
+        return response()->json([
+            'message' => 'Client mis à jour avec succès.',
+            'data' => $user
+        ], 200);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Erreur de validation',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Erreur interne du serveur',
+            'errors' => $e->getMessage()
+        ], 500);
     }
-
-public function deleteUser($id)
-{
-    $user = User::find($id);
-    if (!$user) {
-        return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
-    }
-    $user->delete();
-    return response()->json(['message' => 'Utilisateur supprimé avec succès.']);
 }
 
-public function showadmin($id)
-{
+public function deleteClient($id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $user = User::find($id);
+
+    if (!$user) {
+        return response()->json(['error' => 'Client non trouvé.'], 404);
+    }
+
+    $user->commandes()->update(['paiement_id' => null]);
+
+    $user->delete();
+
+    return response()->json(['message' => 'Client supprimé avec succès.']);
+}
+public function showclient($id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
     $user = User::find($id);
     if (!$user) {
-        return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
+        return response()->json(['error' => 'Client non trouvé.'], 404);
     }
     return response()->json(['user' => $user]);
 }
+public function searchByUsernameclient(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
-public function searchByUsernameadmin(Request $request)
-{
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
     $validator = Validator::make($request->all(), [
         'user_name' => 'required|string|max:255',
     ]);
+
     if ($validator->fails()) {
         return response()->json(['error' => $validator->errors()->first()], 400);
     }
+
     $user = User::where('user_name', $request->user_name)->first();
+
     if (!$user) {
-        return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
+        return response()->json(['error' => 'Client non trouvé.'], 404);
     }
+
     return response()->json(['user' => $user]);
 }
-public function rechercheradmin(Request $request)
-{
+
+ public function rechercherclient(Request $request)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
     $query = User::query();
 
-    // Filtre par statut
-   // if ($request->has('statut')) {
-   //     $query->where('statut', $request->statut);
-   // }
-
-    // Filtre par nom
     if ($request->has('nom')) {
         $query->where('nom', 'like', '%' . $request->nom . '%');
     }
 
-    // Filtre par prénom
     if ($request->has('prenom')) {
         $query->where('prenom', 'like', '%' . $request->prenom . '%');
     }
 
-    // Filtre par numéro de téléphone
     if ($request->has('numero_telephone')) {
         $query->where('numero_telephone', 'like', '%' . $request->numero_telephone . '%');
     }
 
-    // Exécuter la requête
-    $utilisateurs = $query->get();
+    $clients = $query->get();
 
-    return response()->json($utilisateurs);
+    return response()->json($clients);
 }
-public function getUsersByRole(Request $request)
-{
-    // Vérifiez si un rôle est passé dans la requête
-    $validator = Validator::make($request->all(), [
-        'role' => 'required|string|in:operateur,admin,dispatcheur,super admin,digital marketing',
-    ]);
 
-    // Si la validation échoue, renvoyer une réponse d'erreur
-    if ($validator->fails()) {
-        return response()->json(['error' => $validator->errors()->first()], 400);
+
+public function updateClientStatus(Request $request, $id)
+{   $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
+    $rules = [
+        'status' => 'required|string|in:actif,non actif,en attente,bloqué',
+    ];
 
-    // Récupérer l'ID du rôle
-    $role = Role::where('name', $request->role)->first();
+    try {
 
-    // Si le rôle n'existe pas, renvoyer une réponse d'erreur
-    if (!$role) {
-        return response()->json(['error' => 'Rôle non trouvé.'], 404);
+        $validatedData = $request->validate($rules);
+
+        $user = User::findOrFail($id);
+
+        $user->status = $validatedData['status'];
+        $user->save();
+
+        return response()->json([
+            'message' => 'Statut mis à jour avec succès.',
+            'data' => $user
+        ], 200);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Erreur de validation',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Erreur interne du serveur',
+            'errors' => $e->getMessage()
+        ], 500);
     }
-
-    // Récupérer les utilisateurs ayant le rôle spécifié
-    $users = $role->users;
-
-    // Retourner la liste des utilisateurs
-    return response()->json(['users' => $users]);
-}
- // Assurez-vous d'importer le modèle User si ce n'est pas déjà fait
-
-public function getAdmins()
-{
-    // Récupérer tous les utilisateurs
-    $users = User::all();
-
-    return response()->json(['users' => $users]);
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
+
+
 
 

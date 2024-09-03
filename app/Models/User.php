@@ -32,6 +32,7 @@ class User extends Authenticatable implements JWTSubject
            'numero_telephone',
           'user_name',
           'user_image',
+          'status',
     ];
 
     /**
@@ -66,7 +67,7 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->getKey();
     }
-    
+
 
     /**
      * Return a key value array, containing any custom claims to be added to the JWT.
@@ -92,7 +93,9 @@ public function commandes()
 
 public function isAdmin()
 {
-    return $this->role === 'admin'; // Assurez-vous que le champ `role` existe dans la table `users`
+    $allowedRoles = ['admin', 'superadmin', 'dispatcheur','operateur','responsable_marketing' /* add other roles here */];
+
+    return in_array($this->role, $allowedRoles);
 }
 
 }

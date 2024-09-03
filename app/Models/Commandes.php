@@ -33,16 +33,18 @@ class Commandes extends Model
         return $this->hasOne(Paiements::class);
     }
 
-    public function calculerMontantTotal()
+    public function calculerEtMettreAJourMontantTotal()
     {
         $montantTotal = 0;
 
-        foreach ($this->paniers->elements as $element) {
-            $montantTotal += $element->prix_total();
+        foreach ($this->produits as $produit) {
+            $montantTotal += $produit->pivot->prix_total;
         }
 
-        return $montantTotal;
+        $this->montant_total = $montantTotal;
+        $this->save();
     }
+
     public function produits()
     {
         return $this->belongsToMany(Produits::class, 'commandesproduits')

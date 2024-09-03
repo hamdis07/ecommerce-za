@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Auth;
 
 
 
@@ -9,6 +10,15 @@ use Illuminate\Http\Request;
 
 class GenresController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('role:admin|superadmin|dispatcheur|operateur|responsable_marketing')->only([
+            ' store',
+            'update',
+            'destroy',
+
+        ]);
+    }
     // Afficher tous les genres
     public function index()
     {
@@ -25,7 +35,12 @@ class GenresController extends Controller
 
     // Enregistrer un nouveau genre
     public function store(Request $request)
-    {
+    {     $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         $request->validate([
             'nom' => 'required|string',
         ]);
@@ -36,7 +51,12 @@ class GenresController extends Controller
 
     // Mettre à jour un genre
     public function update(Request $request, $id)
-    {
+    {     $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         $request->validate([
             'nom' => 'required|string',
         ]);
@@ -48,7 +68,12 @@ class GenresController extends Controller
 
     // Supprimer un genre
     public function destroy($id)
-    {
+    {     $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         Genre::findOrFail($id)->delete();
         return response()->json(null, 204);
     }

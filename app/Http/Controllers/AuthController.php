@@ -13,11 +13,11 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    public function __construct()
-    {
+   // public function __construct()
+   // {
         // dd('sdfs');
         // $this->middleware('auth:api', ['except' => ['login', 'registre', 'forgotPassword']]);
-    }
+   // }
 
     //public function login(Request $request)
     //{
@@ -29,6 +29,8 @@ class AuthController extends Controller
 
        // return $this->respondWithToken($token);
    // }
+
+   
    public function login(Request $request)
    {
        // 1. Valider les données de la requête
@@ -54,28 +56,26 @@ class AuthController extends Controller
        return response()->json(['token' => $token], 200);
     }
     public function registre(Request $request)
-    {
-        // 1. Définir les règles de validation
-        $rules = [
-            'nom' => 'required|string|max:255',
-            'prenom' => 'required|string|max:255',
-            'genre' => 'required|string|in:Male,Female,Other',
-            'date_de_naissance' => 'required|date',
-            'Addresse' => 'required|string|max:255',
-            'occupation' => 'required|string|max:255',
-            'etat_social' => 'required|string|max:255',
-            'numero_telephone' => 'required|string|max:255',
-            'user_name' => 'required|string|max:255|unique:users',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-            'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Image facultative
-        ];
+{
+    $rules = [
+        'nom' => 'required|string|max:255',
+        'prenom' => 'required|string|max:255',
+        'genre' => 'required|string|in:Male,Female,Other',
+        'date_de_naissance' => 'required|date',
+        'Addresse' => 'required|string|max:255',
+        'occupation' => 'required|string|max:255',
+        'etat_social' => 'required|string|max:255',
+        'numero_telephone' => 'required|string|max:255',
+        'user_name' => 'required|string|max:255|unique:users',
+        'email' => 'required|string|email|max:255|unique:users',
+        'password' => 'required|string|min:8',
+        'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+    ];
 
-        // 2. Valider les données de la requête
-     try{
+    try {
         $validatedData = $request->validate($rules);
-        //dd($request->validated());
-        // 3. Gérer le téléchargement de l'image si elle est présente
+
+        // Handle the image upload if present
         $imageUrl = null;
         if ($request->hasFile('user_image')) {
             $image = $request->file('user_image');
@@ -84,7 +84,7 @@ class AuthController extends Controller
             $imageUrl = asset('images/' . $imageName);
         }
 
-        // 4. Créer l'utilisateur dans la base de données en respectant l'ordre des colonnes
+        // Create user
         $user = new User();
         $user->nom = $validatedData['nom'];
         $user->prenom = $validatedData['prenom'];
@@ -101,24 +101,27 @@ class AuthController extends Controller
         $user->password = Hash::make($validatedData['password']);
         $user->save();
 
-        // 5. Assigner un rôle à l'utilisateur (exemple avec Spatie\Permission)
+        // Assign role
         $role = Role::where('name', 'client')->first();
         if ($role) {
             $user->assignRole($role);
         }
 
-        // 6. Retourner une réponse JSON
         return response()->json([
             'message' => 'User Created',
             'user' => $user
         ], 201);
-    }catch (\Illuminate\Validation\ValidationException $e) {
-        // Gérer l'exception de validation ici
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        // Log the validation errors
+        \Log::error('Validation error: ', $e->errors());
+
         return response()->json([
             'message' => 'Validation error',
             'errors' => $e->errors(),
         ], 422);
-    }}
+    }
+}
+
 
     public function me()
     {
@@ -148,6 +151,28 @@ class AuthController extends Controller
             ? response()->json(['message' => __($status)], 200)
             : response()->json(['error' => __($status)], 400);
     }
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->password = Hash::make($password);
+                $user->save();
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? response()->json(['message' => __($status)], 200)
+            : response()->json(['error' => __($status)], 400);
+    }
+
+
 
     protected function respondWithToken($token)
     {
@@ -158,5 +183,103 @@ class AuthController extends Controller
         ]);
     }
 
+    public function consulterCoordonnees()
+    {
+        // Récupérer l'utilisateur authentifié
+        $user = auth()->user();
 
+        if (!$user) {
+            return response()->json([
+                'message' => 'Utilisateur non trouvé',
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Informations utilisateur récupérées',
+            'user' => $user
+        ], 200);
+    }
+    public function modifierCoordonnees(Request $request)
+    {
+        // Récupérer l'utilisateur authentifié
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Utilisateur non trouvé',
+            ], 404);
+        }
+
+        $rules = [
+            'nom' => 'sometimes|string|max:255',
+            'prenom' => 'sometimes|string|max:255',
+            'genre' => 'sometimes|string|in:Male,Female,Other',
+            'date_de_naissance' => 'sometimes|date',
+            'Addresse' => 'sometimes|string|max:255',
+            'occupation' => 'sometimes|string|max:255',
+            'etat_social' => 'sometimes|string|max:255',
+            'numero_telephone' => 'sometimes|string|max:255',
+            'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $user->id,
+            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $user->id,
+            'password' => 'sometimes|string|min:8|confirmed',
+            'current_password' => 'required|string', // Require current password
+            'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ];
+
+        try {
+            $validatedData = $request->validate($rules);
+
+            // Verify the current password
+            if (!Hash::check($validatedData['current_password'], $user->password)) {
+                return response()->json([
+                    'message' => 'Le mot de passe actuel est incorrect',
+                ], 400);
+            }
+
+            // Handle the image upload if present
+            if ($request->hasFile('user_image')) {
+                $image = $request->file('user_image');
+                $imageName = time() . '_' . $image->getClientOriginalName();
+                $image->move(public_path('images'), $imageName);
+                $user->user_image = asset('images/' . $imageName);
+            }
+
+            // Remove current_password from validated data
+            unset($validatedData['current_password']);
+
+            // Mettre à jour les informations utilisateur
+            if (isset($validatedData['password'])) {
+                $validatedData['password'] = Hash::make($validatedData['password']);
+            }
+
+            $user->update($validatedData);
+
+            return response()->json([
+                'message' => 'Coordonnées mises à jour avec succès',
+                'user' => $user
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Log the validation errors
+            \Log::error('Validation error: ', $e->errors());
+
+            return response()->json([
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+    }
+
+    public function historiquedachat()
+    {
+        // Récupérer l'utilisateur connecté
+        $user = Auth::user();
+
+        // Récupérer les commandes de l'utilisateur
+        $commandes = $user->commandes()->with('produits', 'paiement', 'livraisondetails')->get();
+
+        // Retourner la vue ou JSON
+        return response()->json([
+            'commandes' => $commandes
+        ]);
+    }
 }
