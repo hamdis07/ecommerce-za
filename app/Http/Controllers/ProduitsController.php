@@ -758,39 +758,7 @@ public function updatePromos($idProduit, $idPromos, Request $request)
 }
 
 
-public function updateOrCreatePromos($idProduit, Request $request)
-{$user = Auth::user();
-    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
-    if (!$user || !$user->hasAnyRole($roles)) {
-        return response()->json(['message' => 'Unauthorized'], 403);
-    }
-    $produit = Produits::findOrFail($idProduit);
-
-    $request->validate([
-        'nom' => 'required|string',
-        'pourcentage_reduction' => 'required|numeric',
-        'date_debut' => 'required|date',
-        'date_fin' => 'required|date|after:date_debut',
-    ]);
-
-    $promotion = Promos::updateOrCreate(
-        [
-            'nom' => $request->nom,
-            'pourcentage_reduction' => $request->pourcentage_reduction,
-            'date_debut' => $request->date_debut,
-            'date_fin' => $request->date_fin,
-        ]
-    );
-
-    $nouveauPrix = $produit->prix_initial * (1 - $request->pourcentage_reduction / 100);
-
-    $produit->promo_id = $promotion->id;
-    $produit->prix = $nouveauPrix;
-    $produit->save();
-
-    return response()->json('Promotion mise à jour ou créée avec succès pour le produit.', 200);
-}
 
 public function removePromos($idProduit)
 {$user = Auth::user();
@@ -934,3 +902,36 @@ public function unhideProduct($idProduit)
 
 
 }
+//public function updateOrCreatePromos($idProduit, Request $request)
+// {$user = Auth::user();
+//     $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+//     if (!$user || !$user->hasAnyRole($roles)) {
+//         return response()->json(['message' => 'Unauthorized'], 403);
+//     }
+//     $produit = Produits::findOrFail($idProduit);
+
+//     $request->validate([
+//         'nom' => 'required|string',
+//         'pourcentage_reduction' => 'required|numeric',
+//         'date_debut' => 'required|date',
+//         'date_fin' => 'required|date|after:date_debut',
+//     ]);
+
+//     $promotion = Promos::updateOrCreate(
+//         [
+//             'nom' => $request->nom,
+//             'pourcentage_reduction' => $request->pourcentage_reduction,
+//             'date_debut' => $request->date_debut,
+//             'date_fin' => $request->date_fin,
+//         ]
+//     );
+
+//     $nouveauPrix = $produit->prix_initial * (1 - $request->pourcentage_reduction / 100);
+
+//     $produit->promo_id = $promotion->id;
+//     $produit->prix = $nouveauPrix;
+//     $produit->save();
+
+//     return response()->json('Promotion mise à jour ou créée avec succès pour le produit.', 200);
+// }
