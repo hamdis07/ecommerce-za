@@ -14,6 +14,7 @@ class MessageEnvoyer extends Model
         'message_id',
         'user_id',
         'content',
+        'attachments',
     ];
 
     /**

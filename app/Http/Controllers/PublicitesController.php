@@ -80,12 +80,14 @@ class PublicitesController extends Controller
     public function index()
     {
         try {
-            $bannieres = Publicites::all();
+            $currentDate = now(); // Récupère la date et l'heure actuelles
+            $bannieres = Publicites::where('date_fin', '>', $currentDate)->get();
             return response()->json($bannieres);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Erreur lors de la récupération des bannières publicitaires', 'message' => $e->getMessage()], 500);
         }
     }
+
 
     public function show($id)
     {

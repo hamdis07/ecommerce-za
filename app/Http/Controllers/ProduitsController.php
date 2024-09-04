@@ -64,7 +64,6 @@ class ProduitsController extends Controller
                 'promo.date_debut' => 'nullable|date',
                 'promo.date_fin' => 'nullable|date|after:promo.date_debut',
             ]);
-
             \Log::info('Début de la création du produit');
 
             $genre = Genre::firstOrCreate(['nom' => $request->genre]);
@@ -90,7 +89,7 @@ class ProduitsController extends Controller
 
             \Log::info('Produit sauvegardé avec ID: ' . $produit->id);
 
-            if ($request->hasFile('images')) {
+            if ($request->has('images') && is_array($request->images)) {
                 foreach ($request->file('images') as $imageFile) {
                     $imageName = time() . '_' . $imageFile->getClientOriginalName();
                     $imagePath = $imageFile->storeAs('public/images', $imageName);
@@ -100,18 +99,18 @@ class ProduitsController extends Controller
                         'chemin_image' => 'public/images/' . $imageName,
                         'produit_id' => $produit->id
                     ]);
-                    \Log::info('Image enregistrée dans la base de données: ' . $imageName);
                 }
             } else {
                 \Log::info('Aucune image détectée');
             }
-
             if ($request->hasFile('image_url')) {
                 $video = $request->file('image_url');
                 $videoName = time() . '_' . $video->getClientOriginalName();
                 $video->storeAs('public/videos', $videoName);
                 $produit->image_url = Storage::url('videos/' . $videoName);
                 $produit->save();
+
+
             }
 
             \Log::info('Traitement des magasins commencé');

@@ -14,63 +14,75 @@ class SousCategorieController extends Controller
 
 
     public function store(Request $request)
-{   $user = Auth::user();
-    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+    {
+        $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
-    if (!$user || !$user->hasAnyRole($roles)) {
-        return response()->json(['message' => 'Unauthorized'], 403);
-    }
-    $request->validate([
-        'nom' => 'required|string',
-        'categorie_id' => 'nullable|exists:categories,id',
-    ]);
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
-    $categorieId = $request->input('categorie_id');
+        // Validation des champs
+        $request->validate([
+            'nom' => 'required|string',
+            'categorie_nom' => 'required|string', // Validation pour le nom de la catégorie
+        ]);
 
-    if ($categorieId && !Categories::find($categorieId)) {
-        $categorie = Categories::create(['nom' => 'Nouvelle catégorie']);
-        $categorieId = $categorie->id;
-    }
+        // Récupérer ou créer la catégorie par son nom
+        $categorie = Categories::firstOrCreate(
+            ['nom' => $request->input('categorie_nom')],
+            ['nom' => $request->input('categorie_nom')]
+        );
 
-    $sousCategorie = SousCategories::create([
-        'categorie_id' => $categorieId,
-        'nom' => $request->input('nom'),
-    ]);
+        // Créer la sous-catégorie
+        $sousCategorie = SousCategories::create([
+            'categorie_id' => $categorie->id,
+            'nom' => $request->input('nom'),
+        ]);
 
-    return response()->json($sousCategorie, 201);
-}
-public function update(Request $request, $id)
-{   $user = Auth::user();
-    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
-
-    if (!$user || !$user->hasAnyRole($roles)) {
-        return response()->json(['message' => 'Unauthorized'], 403);
-    }
-    $request->validate([
-        'nom' => 'required|string',
-        'categorie_id' => 'nullable|exists:categories,id',
-    ]);
-
-    $categorieId = $request->input('categorie_id');
-
-    if ($categorieId && !Categories::find($categorieId)) {
-        $categorie = Categories::create(['nom' => 'Nouvelle catégorie']);
-        $categorieId = $categorie->id;
+        return response()->json($sousCategorie, 201);
     }
 
-    $sousCategorie = Souscategories::findOrFail($id);
-    $sousCategorie->update([
-        'categorie_id' => $categorieId,
-        'nom' => $request->input('nom'),
-    ]);
+    public function update(Request $request, $id)
+    {
+        $user = Auth::user();
+        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
-    return response()->json($sousCategorie, 200);
-}
-public function index()
-{
-    $sousCategories = SousCategories::all();
-    return response()->json($sousCategories);
-}
+        if (!$user || !$user->hasAnyRole($roles)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Validation des champs
+        $request->validate([
+            'nom' => 'required|string',
+            'categorie_nom' => 'required|string', // Validation pour le nom de la catégorie
+        ]);
+
+        // Récupérer ou créer la catégorie par son nom
+        $categorie = Categories::firstOrCreate(
+            ['nom' => $request->input('categorie_nom')],
+            ['nom' => $request->input('categorie_nom')]
+        );
+
+        // Trouver la sous-catégorie à mettre à jour
+        $sousCategorie = Souscategories::findOrFail($id);
+
+        // Mettre à jour la sous-catégorie
+        $sousCategorie->update([
+            'categorie_id' => $categorie->id,
+            'nom' => $request->input('nom'),
+        ]);
+
+        return response()->json($sousCategorie, 200);
+    }
+
+    public function index()
+    {
+        $categories = Categories::with('sousCategories')->get();
+
+        return response()->json($categories);
+    }
+
 
 public function show($id)
 {

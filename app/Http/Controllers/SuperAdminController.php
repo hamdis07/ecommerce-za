@@ -259,7 +259,7 @@ public function getUsersByRole(Request $request)
     }
     // Vérifiez si un rôle est passé dans la requête
     $validator = Validator::make($request->all(), [
-        'role' => 'required|string|in:operateur,admin,dispatcheur,super admin,digital marketing',
+        'role' => 'required|string|in:superadmin,operateur,admin,dispatcheur,super admin,digital marketing',
     ]);
 
     if ($validator->fails()) {
@@ -286,11 +286,11 @@ public function getUsersByRole(Request $request)
         return response()->json(['message' => 'Unauthorized'], 403);
     }
      $perPage = $request->input('per_page', 10); // Number of items per page
-     $sortBy = $request->input('sort_by', 'name'); // Field to sort by (default: 'name')
+     $sortBy = $request->input('sort_by', 'nom'); // Field to sort by (default: 'name')
      $sortOrder = $request->input('sort_order', 'asc'); // Sorting order (default: 'asc')
 
      // Validate sorting inputs
-     if (!in_array($sortBy, ['name', 'email', 'numero_telephone', 'occupation'])) {
+     if (!in_array($sortBy, ['nom', 'email', 'numero_telephone', 'occupation'])) {
          return response()->json([
              'message' => 'Invalid sort field',
          ], 400);

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use App\Exports\CommandesExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
+use App\Models\configuration;
 
 
 use App\Models\Produits;

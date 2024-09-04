@@ -27,7 +27,12 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])->withou
 
 Route::get('/reset-password/{token}', function ($token) {
 })->name('password.reset');
+Route::get('/messages/boite-messagerie', [MessageEnvoyerController::class, 'viewUserMessages']);
 
+      Route::get('/messages/clients', [MessageEnvoyerController::class, 'listClients']);
+      Route::get('/messages/admins', [MessageEnvoyerController::class, 'listAdmins']);
+      Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
+      Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
 
 Route::get('/sous-categories/{id}', [SousCategorieController::class, 'show']);
 Route::get('/sous-categories', [SousCategorieController::class, 'index']);
@@ -93,6 +98,7 @@ Route::group([
    // Route::delete('/messages/{id}', [MessageEnvoyerController::class, 'deleteMessage']);
     Route::post('/messages/contact-admin', [MessageEnvoyerController::class, 'contactAdmin']);
 
+
 });
 
 
@@ -121,7 +127,7 @@ Route::middleware('auth:api')->group(function () {
 
       Route::post('/produits/{idProduit}/promos', [ProduitsController::class, 'ajouterPromos']);
       Route::post('/produits/{idProduit}/promos/{idPromos}', [ProduitsController::class, 'updatePromos']);
-      Route::post('/produits/{idProduit}/promos/update-or-create', [ProduitsController::class, 'updateOrCreatePromos']);
+      //Route::post('/produits/{idProduit}/promos/update-or-create', [ProduitsController::class, 'updateOrCreatePromos']);
       Route::delete('/produits/{idProduit}/promos', [ProduitsController::class, 'removePromos']);
       Route::post('/produits/promos/apply-to-multiple', [ProduitsController::class, 'applyPromosToMultipleProducts']);
       Route::get('/produits/afficherTousLesProduits', [ProduitsController::class, 'afficherTousLesProduits']);
@@ -130,6 +136,8 @@ Route::middleware('auth:api')->group(function () {
       Route::post('/produits/{idProduit}/hide', [ProduitsController::class, 'hideProduct']);
       Route::post('/produits/{idProduit}/unhide', [ProduitsController::class, 'unhideProduct']);
       Route::post('/produits/nouveauproduit', [ProduitsController::class, 'nouveauProduit']);
+
+
       Route::Post('/produits/modifierleproduit/{id}', [ProduitsController::class, 'modifierProduit']);
       Route::delete('/produits/supprimerProduit/{id}', [ProduitsController::class, 'supprimerProduit']);
 
@@ -144,11 +152,11 @@ Route::middleware('auth:api')->group(function () {
 
 
 
-        Route::get('messages/clients', [MessageEnvoyerController::class, 'listClients']);
-        Route::get('messages/admins', [MessageEnvoyerController::class, 'listClients']);
+      //Route::get('/messages/clients', [MessageEnvoyerController::class, 'listClients']);
+      //Route::get('/messages/admins', [MessageEnvoyerController::class, 'listAdmins']);
         Route::get('/messages', [MessageEnvoyerController::class, 'listMessages']);
-        Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
-        Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
+       // Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
+       // Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
         Route::post('/messages/search', [MessageEnvoyerController::class, 'searchMessages']);
         Route::post('/messages/send-to-client/{id}', [MessageEnvoyerController::class, 'sendMessageToClient']);
         Route::post('/users/{userId}/block', [MessageEnvoyerController::class, 'blockUser']);
@@ -157,8 +165,9 @@ Route::middleware('auth:api')->group(function () {
 
 
 
+
         Route::post('/publicites/update/{id}', [PublicitesController::class, 'update']);
-        Route::delete('/publicites/{id}', [PublicitesController::class, 'destroy']);
+        Route::delete('/publicites/delete/{id}', [PublicitesController::class, 'destroy']);
         Route::post('/publicites/create', [PublicitesController::class, 'store']);
 
 
