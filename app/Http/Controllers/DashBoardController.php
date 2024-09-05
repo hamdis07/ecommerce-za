@@ -8,7 +8,7 @@ use App\Models\Produits;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-class DashboardController extends Controller
+class DashBoardController extends Controller
 {
     public function stats()
     {

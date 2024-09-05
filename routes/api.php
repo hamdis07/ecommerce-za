@@ -177,7 +177,7 @@ Route::middleware('auth:api')->group(function () {
 //superadminauth
 
 Route::group(['middleware' => ['auth']], function () {
-   Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
+    Route::post('/admin/create', [SuperAdminController::class, 'createadministrateur']);
     Route::post('/admin/update/{id}', [App\Http\Controllers\SuperAdminController::class, 'updateadmin']);
     Route::delete('/admin/delete/{id}', [SuperAdminController::class, 'deleteUser']);
     Route::get('/admin/show/{id}', [SuperAdminController::class, 'showadmin']);

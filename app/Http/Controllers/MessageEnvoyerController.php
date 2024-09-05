@@ -251,7 +251,7 @@ public function getClients(Request $request)
     // Valider les données entrantes
     $request->validate([
         'content' => 'required|string',
-        'files.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
+        'file.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
     ]);
 
     // Convertir l'user_id en tableau si plusieurs IDs sont fournis
@@ -285,9 +285,9 @@ public function getClients(Request $request)
         ]);
 
         // Gérer les fichiers joints
-        if ($request->hasFile('files')) {
+        if ($request->hasFile('file')) {
             $filePaths = [];
-            foreach ($request->file('files') as $file) {
+            foreach ($request->file('file') as $file) {
                 // Stocker le fichier et obtenir le chemin
                 $path = $file->store('messages', 'public');
                 // Générer l'URL complète pour le fichier
@@ -306,7 +306,7 @@ public function getClients(Request $request)
 {
     $request->validate([
         'content' => 'required|string',
-        'files.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
+        'file.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
     ]);
 
     $user = Auth::user();
@@ -332,9 +332,9 @@ public function getClients(Request $request)
     ]);
 
     // Gérer les fichiers joints
-    if ($request->hasFile('files')) {
+    if ($request->hasFile('file')) {
         $filePaths = [];
-        foreach ($request->file('files') as $file) {
+        foreach ($request->file('file') as $file) {
             // Enregistrer le fichier et récupérer son chemin
             $path = $file->store('messages', 'public');
             $filePaths[] = $path;

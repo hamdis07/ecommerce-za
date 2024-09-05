@@ -5,7 +5,7 @@ use Illuminate\Console\Command;
 use App\Models\Promos;
 use App\Models\Produits;
 use Carbon\Carbon;
-use Illuminate\Console\Scheduling\Schedule;
+//use Illuminate\Console\Scheduling\Schedule;
 
 class UpdateProductPrices extends Command
 {
@@ -38,9 +38,9 @@ class UpdateProductPrices extends Command
 
         $this->info('Les prix des produits ont été mis à jour.');
     }
-    public function schedule(Schedule $schedule)
-    {
-        // Planifie l'exécution quotidienne de la commande
-        $schedule->command(static::class)->daily();
-    }
+    // public function schedule(Schedule $schedule)
+    // {
+    //     // Planifie l'exécution quotidienne de la commande
+    //     $schedule->command(static::class)->daily();
+    // }
 }

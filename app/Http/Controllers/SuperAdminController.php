@@ -188,18 +188,31 @@ public function deleteUser($id)
 }
 
 public function showadmin($id)
-{   $user = Auth::user();
+{
+    $user = Auth::user();
     $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
+    // Check if the authenticated user has any of the specified roles
     if (!$user || !$user->hasAnyRole($roles)) {
         return response()->json(['message' => 'Unauthorized'], 403);
     }
+
+    // Find the user by ID
     $user = User::find($id);
     if (!$user) {
         return response()->json(['error' => 'Utilisateur non trouvé.'], 404);
     }
-    return response()->json(['user' => $user]);
+
+    // Get the roles of the user
+    $userRoles = $user->roles->pluck('name'); // Assuming the roles are related and you want the names
+
+    // Include the roles in the response
+    return response()->json([
+        'user' => $user,
+        'roles' => $userRoles
+    ]);
 }
+
 
 public function searchByUsernameadmin(Request $request)
 {   $user = Auth::user();

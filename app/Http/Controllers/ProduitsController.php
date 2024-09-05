@@ -92,25 +92,23 @@ class ProduitsController extends Controller
             if ($request->has('images') && is_array($request->images)) {
                 foreach ($request->file('images') as $imageFile) {
                     $imageName = time() . '_' . $imageFile->getClientOriginalName();
-                    $imagePath = $imageFile->storeAs('public/images', $imageName);
-                    \Log::info('Image sauvegardée: ' . $imageName);
+                    $imagePath = $imageFile->move(public_path('images'), $imageName);
+                    $imageUrl = asset('images/' . $imageName); // Assurez-vous que le chemin est correct
+                    \Log::info('Image sauvegardée: ' . $imageUrl); // Vérifiez si l'URL est correcte
 
                     Images::create([
-                        'chemin_image' => 'public/images/' . $imageName,
+                        'chemin_image' => $imageUrl,
                         'produit_id' => $produit->id
                     ]);
                 }
-            } else {
-                \Log::info('Aucune image détectée');
             }
+
             if ($request->hasFile('image_url')) {
                 $video = $request->file('image_url');
                 $videoName = time() . '_' . $video->getClientOriginalName();
-                $video->storeAs('public/videos', $videoName);
-                $produit->image_url = Storage::url('videos/' . $videoName);
+                $video->move(public_path('videos'), $videoName);
+                $produit->image_url = asset('videos/' . $videoName);  // Use asset() to get the public URL
                 $produit->save();
-
-
             }
 
             \Log::info('Traitement des magasins commencé');
