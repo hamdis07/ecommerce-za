@@ -77,7 +77,7 @@ class PublicitesController extends Controller
         }
     }
 
-    public function index()
+    public function index1()
     {
         try {
             $currentDate = now(); // Récupère la date et l'heure actuelles
@@ -87,6 +87,22 @@ class PublicitesController extends Controller
             return response()->json(['error' => 'Erreur lors de la récupération des bannières publicitaires', 'message' => $e->getMessage()], 500);
         }
     }
+
+public function index(Request $request)
+{
+    try {
+        // Set the number of items per page
+        $perPage = 10; // Change this number as needed
+
+        // Fetch all publicites with pagination
+        $bannieres = Publicites::paginate($perPage);
+
+        // Return the paginated results as a JSON response
+        return response()->json($bannieres);
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'Erreur lors de la récupération des bannières publicitaires', 'message' => $e->getMessage()], 500);
+    }
+}
 
 
     public function show($id)
@@ -130,11 +146,11 @@ class PublicitesController extends Controller
 
         try {
             $validatedData = $request->validate([
-                'nom' => 'sometimes|string',
+                'nom' => 'nullable|string',
                 'detail' => 'nullable|string',
-                'date_lancement' => 'sometimes|date',
-                'date_fin' => 'sometimes|date|after:date_lancement',
-                'montant_paye' => 'sometimes|numeric',
+                'date_lancement' => 'nullable|date',
+                'date_fin' => 'nullable|date|after:date_lancement',
+                'montant_paye' => 'nullable|numeric',
                 'image' => 'nullable|file|image|max:2048', // Validation pour l'image
                 'video' => 'nullable|file|mimes:mp4,mov,avi|max:20480', // Validation pour la vidéo
                 'affiche' => 'nullable|file|image|max:2048' // Validation pour l'affiche

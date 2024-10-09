@@ -12,7 +12,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PaniersController extends Controller
-{public function consulterPanier()
+{
+
+    public function consulterPanier()
     {
         // Vérification si l'utilisateur est connecté
         if (!Auth::check()) {
@@ -22,7 +24,7 @@ class PaniersController extends Controller
         // Récupération de l'utilisateur connecté
         $user = Auth::user();
 
-        // Récupération du panier de l'utilisateur
+        // Récupération du panier de l'utilisateur avec les produits associés
         $paniers = $user->paniers()->with('produits')->first();
 
         // Vérification si le panier existe et contient des produits
@@ -33,7 +35,7 @@ class PaniersController extends Controller
         // Préparer la réponse avec les détails des produits dans le panier
         $produitsDansPanier = $paniers->produits->map(function ($produit) {
             return [
-                'produit_id' => $produit->pivot->produits_id,
+                'produit_id' => $produit->pivot->produit_id,  // Correction ici pour utiliser produit_id
                 'nom' => $produit->nom_produit,
                 'image_url' => $produit->image_url,
                 'taille' => $produit->pivot->taille,

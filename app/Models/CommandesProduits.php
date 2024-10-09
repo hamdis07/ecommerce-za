@@ -11,7 +11,7 @@ class CommandesProduits extends Model
 
     protected $table = 'commandesproduits';
 
-    protected $fillable = ['commande_id', 'produit_id', 'quantite', 'taille', 'couleur', 'prix_total'];
+    protected $fillable = ['commandes_id', 'produits_id', 'quantite', 'taille', 'couleur', 'prix_total'];
 
     public function commande()
     {

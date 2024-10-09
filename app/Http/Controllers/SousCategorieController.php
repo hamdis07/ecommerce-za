@@ -45,9 +45,11 @@ class SousCategorieController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Authentification de l'utilisateur
         $user = Auth::user();
         $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
+        // Vérification des rôles de l'utilisateur
         if (!$user || !$user->hasAnyRole($roles)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -55,34 +57,64 @@ class SousCategorieController extends Controller
         // Validation des champs
         $request->validate([
             'nom' => 'required|string',
-            'categorie_nom' => 'required|string', // Validation pour le nom de la catégorie
+            'categorie_nom' => 'nullable|string', // Validation pour le nom de la catégorie
         ]);
 
-        // Récupérer ou créer la catégorie par son nom
-        $categorie = Categories::firstOrCreate(
-            ['nom' => $request->input('categorie_nom')],
-            ['nom' => $request->input('categorie_nom')]
-        );
+        // Initialiser l'ID de la catégorie
+        $categorieId = null;
+
+        // Vérifiez si le champ categorie_nom est rempli
+        if ($request->filled('categorie_nom')) {
+            // Récupérer ou créer la catégorie par son nom
+            $categorie = Categories::firstOrCreate(
+                ['nom' => $request->input('categorie_nom')],
+                ['nom' => $request->input('categorie_nom')]
+            );
+            $categorieId = $categorie->id; // Obtenez l'ID de la catégorie
+        }
 
         // Trouver la sous-catégorie à mettre à jour
         $sousCategorie = Souscategories::findOrFail($id);
 
         // Mettre à jour la sous-catégorie
         $sousCategorie->update([
-            'categorie_id' => $categorie->id,
+            'categorie_id' => $categorieId, // Utiliser l'ID de catégorie ou null si catégorie_nom est vide
             'nom' => $request->input('nom'),
         ]);
 
         return response()->json($sousCategorie, 200);
     }
 
-    public function index()
+
+    public function index(Request $request)
     {
-        $categories = Categories::with('sousCategories')->get();
+        // Get the number of items per page from the query string, default to 10
+        $perPage = $request->input('per_page', 10);
 
-        return response()->json($categories);
+        // Get the page number from the query string, default to 1
+        $currentPage = $request->input('page', 1);
+
+        // Fetch categories with their subcategories, using pagination
+        $categories = Categories::with('sousCategories')
+            ->paginate($perPage);
+
+        return response()->json([
+            'data' => $categories->items(),
+            'total' => $categories->total(),
+            'current_page' => $categories->currentPage(),
+            'last_page' => $categories->lastPage(),
+            'per_page' => $categories->perPage(),
+        ]);
     }
-
+    public function index1(Request $request)
+    {
+        // Fetch all categories with their corresponding subcategories
+        $categories = Categories::with('sousCategories')->get();
+// dd();
+        return response()->json([
+            'data' => $categories, // Retourne toutes les catégories avec leurs sous-catégories
+        ]);
+    }
 
 public function show($id)
 {

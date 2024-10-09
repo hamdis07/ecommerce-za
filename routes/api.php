@@ -3,6 +3,7 @@ use App\Http\Middleware\JWTMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\NotificationController;
 
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\SousCategorieController;
@@ -15,10 +16,11 @@ use App\Http\Controllers\MessageriesController;
 use App\Http\Controllers\PaniersController;
 use App\Http\Controllers\CommandesController;
 use App\Http\Controllers\PublicitesController;
-
+use App\Http\controllers\MagasinsController;
 use App\Http\Controllers\DashBoardController;
 
 //route public
+Route::get('/messages/conversation/{userId}', [MessageEnvoyerController::class, 'getConversationWithUser']);
 
 Route::post('/registre', [AuthController::class, 'registre'])->withoutMiddleware(JWTMiddleware::class);
 Route::post('/login', [AuthController::class, 'login'])->withoutMiddleware(JWTMiddleware::class);
@@ -29,17 +31,16 @@ Route::get('/reset-password/{token}', function ($token) {
 })->name('password.reset');
 Route::get('/messages/boite-messagerie', [MessageEnvoyerController::class, 'viewUserMessages']);
 
-      Route::get('/messages/clients', [MessageEnvoyerController::class, 'listClients']);
-      Route::get('/messages/admins', [MessageEnvoyerController::class, 'listAdmins']);
-      Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
-      Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
 
-Route::get('/sous-categories/{id}', [SousCategorieController::class, 'show']);
-Route::get('/sous-categories', [SousCategorieController::class, 'index']);
+Route::get('/souscategories/{id}', [SousCategorieController::class, 'show']);
+Route::get('/souscategories', [SousCategorieController::class, 'index']);
+Route::get('/souscategorie', [SousCategorieController::class, 'index1']);
+
 Route::get('/genres/{id}', [GenresController::class, 'show']);
 Route::get('/genres', [GenresController::class, 'index']);
 Route::get('categories', [CategoriesController::class, 'index']);
 Route::get('categories/{id}', [CategoriesController::class, 'show']);
+
 
 Route::get('/produits/produits/{id}', [ProduitsController::class, 'getProduitById']);
 Route::get('/produits/genre/{genreId}', [ProduitsController::class, 'produitsParGenre']);
@@ -54,11 +55,16 @@ Route::get('/produits/sous-categorie/{sousCategorieId}', [ProduitsController::cl
 Route::get('/produits/promotions', [ProduitsController::class, 'produitsEnPromotions']);
 Route::get('/produits/les-plus-commandes', [ProduitsController::class, 'produitsLesPlusCommandes']);
 
+Route::get('/messages/clients', [MessageEnvoyerController::class, 'listClients']);
+        Route::get('/messages/admins', [MessageEnvoyerController::class, 'listAdmins']);
+        Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
+        Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
+
 
 
 Route::get('/publicites/{id}', [PublicitesController::class, 'show']);
 
-Route::get('/publicites', [PublicitesController::class, 'index']);
+Route::get('/publicites', [PublicitesController::class, 'index1']);
 
 //route prive quote client ;
 
@@ -88,6 +94,7 @@ Route::group([
 
 //commandes controller
     Route::get('/fraislivraison', [CommandesController::class, 'obtenirFraisLivraison']);
+    Route::get('/addresslivraion', [CommandesController::class, 'Adressexistente']);
 
     Route::post('/commander', [CommandesController::class, 'commander']);
     Route::get('/commandes/detailscommande', [CommandesController::class, 'voirDetailsCommande']);
@@ -103,6 +110,13 @@ Route::group([
 
 
 
+Route::middleware('auth')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/supprimer/{id}', [NotificationController::class, 'deleteNotification']);
+
+});
 
 
 //cote admin
@@ -113,17 +127,17 @@ Route::middleware('auth:api')->group(function () {
 
 Route::middleware('auth:api')->group(function () {
 
-      Route::post('/categories', [CategoriesController::class, 'store']);
-      Route::put('/categories/{id}', [CategoriesController::class, 'update']);
-      Route::delete('/categories/{id}', [CategoriesController::class, 'destroy']);
+      Route::post('/categories/create', [CategoriesController::class, 'store']);
+      Route::post('/categories/update/{id}', [CategoriesController::class, 'update']);
+      Route::delete('/categories/delete/{id}', [CategoriesController::class, 'destroy']);
 
       Route::post('/genres', [GenresController::class, 'store']);
       Route::put('/genres/{id}', [GenresController::class, 'update']);
       Route::delete('/genres/{id}', [GenresController::class, 'destroy']);
 
-      Route::post('/sous-categories', [SousCategorieController::class, 'store']);
-      Route::put('/sous-categories/{id}', [SousCategorieController::class, 'update']);
-      Route::delete('/sous-categories/{id}', [SousCategorieController::class, 'destroy']);
+      Route::post('/souscategories/create', [SousCategorieController::class, 'store']);
+      Route::put('/souscategories/update/{id}', [SousCategorieController::class, 'update']);
+      Route::delete('/souscategories/supprimer/{id}', [SousCategorieController::class, 'destroy']);
 
       Route::post('/produits/{idProduit}/promos', [ProduitsController::class, 'ajouterPromos']);
       Route::post('/produits/{idProduit}/promos/{idPromos}', [ProduitsController::class, 'updatePromos']);
@@ -150,11 +164,18 @@ Route::middleware('auth:api')->group(function () {
       Route::get('/commandes/{commandeId}/details', [CommandesController::class, 'voirDetailsCommandepouradmin']);
       Route::get('/commandes/details', [CommandesController::class, 'detailsCommandes']);
 
-
-
+      Route::post('/commander-pour-client', [CommandesController::class, 'commanderPourClient']);
+      Route::get('/commandes/recherche', [CommandesController::class, 'recherche']);
+      Route::delete('/commandes/supprimer/{id}', [CommandesController::class, 'supprimerCommande']);
+      Route::get('/users', [CommandesController::class, 'allusers']);
+      Route::get('/produits', [CommandesController::class, 'allproducts']);
       //Route::get('/messages/clients', [MessageEnvoyerController::class, 'listClients']);
       //Route::get('/messages/admins', [MessageEnvoyerController::class, 'listAdmins']);
         Route::get('/messages', [MessageEnvoyerController::class, 'listMessages']);
+        Route::get('/messages/{id}', [MessageEnvoyerController::class, 'getmessagebyid']);
+
+
+
        // Route::get('/messages/unread', [MessageEnvoyerController::class, 'listUnreadMessages']);
        // Route::get('/messages/read', [MessageEnvoyerController::class, 'listReadMessages']);
         Route::post('/messages/search', [MessageEnvoyerController::class, 'searchMessages']);
@@ -163,12 +184,18 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/users/{userId}/unblock', [MessageEnvoyerController::class, 'unblockUser']);
 
 
+        Route::get('/magasins/stock/{id}', [MagasinsController::class, 'getProductsByMagasin']);
 
-
+        Route::get('/magasins/afficher', [MagasinsController::class, 'index']);
+        Route::post('/magasins/create', [MagasinsController::class, 'store']);
+        Route::get('/magasins/afficher/{id}', [MagasinsController::class, 'show']);
+        Route::put('/magasins/modifier/{id}', [MagasinsController::class, 'update']);
+        Route::delete('/magasins/delete/{id}', [MagasinsController::class, 'destroy']);
 
         Route::post('/publicites/update/{id}', [PublicitesController::class, 'update']);
         Route::delete('/publicites/delete/{id}', [PublicitesController::class, 'destroy']);
         Route::post('/publicites/create', [PublicitesController::class, 'store']);
+        Route::get('/publicites', [PublicitesController::class, 'index']);
 
 
     });
@@ -196,6 +223,13 @@ Route::group(['middleware' => ['auth']], function () {
   Route::get('/client/get-clients', [SuperAdminController::class, 'getClients']);
   Route::patch('/client/update-status/{id}', [SuperAdminController::class, 'updateClientStatus']);
 
+
+
+
+
+
+  Route::get('/users', [SuperAdminController::class, 'getUsers']);
+
 });
 
 
@@ -204,16 +238,18 @@ Route::group(['middleware' => ['auth']], function () {
 // Routes pour la gestion des promotions
 
 //
+Route::get('/promos/produits', [PromosController::class, 'allproducts']);
 
-// Route::get('/promos', [PromosController::class, 'index']);
-// Route::post('/promos', [PromosController::class, 'store']);
-// Route::get('/promos/{id}', [PromosController::class, 'show']);
-// Route::put('/promos/{id}', [PromosController::class, 'update']);
-// Route::delete('/promos/{id}', [PromosController::class, 'destroy']);
-// //
+Route::post('/promos/appliquerunepromotion', [PromosController::class, 'applyPromosToMultipleProducts']);
+route::get('/promos/{promoId}/products', [PromosController::class, 'getProductsByPromoId']);
+Route::get('/promos', [PromosController::class, 'index']);
+Route::post('/promos/creerunepromotion', [PromosController::class, 'store']);
+Route::get('/promos/afficher/{id}', [PromosController::class, 'show']);
+Route::put('/promos/modifier/{id}', [PromosController::class, 'update']);
+Route::delete('/promos/supprimer/{id}', [PromosController::class, 'destroy']);
+route::post('/promos/apply-existing-promo/{promo_id}', [PromosController::class, 'applyExistingPromoToMultipleProducts']);
 //Route::get('/publicites', [PublicitesController::class, 'index']);
 //Route::get('/publicites/{id}', [PublicitesController::class, 'show']);
-
 
 
 });

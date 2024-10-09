@@ -183,15 +183,29 @@ public function getClients(Request $request)
 
     // Lister tous les messages
     public function listMessages()
-    {     $user = Auth::user();
+    {
+        $user = Auth::user();
         $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
         if (!$user || !$user->hasAnyRole($roles)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        $messages = Messagerie::with('user')->get();
+
+        // Eager load the 'user' relationship and select additional fields
+        $messages = Messagerie::with(['user:id,user_name,user_image']) // Assuming the relationship is defined in the Messagerie model
+            ->get();
+
+        // Append the user details to each message for the response
+        $messages->each(function ($message) {
+            $message->user_name = $message->user->user_name;
+            $message->user_image = $message->user->user_image;
+            unset($message->user); // Optional: Remove the 'user' relationship to clean up the response
+        });
+
         return response()->json($messages);
     }
+
+
 
     // Lister les messages non lus
     public function listUnreadMessages()
@@ -395,6 +409,56 @@ public function getClients(Request $request)
     $message->update(['read' => true]);
 
     return response()->json(['message' => 'Message marked as read.']);
+}public function getMessageById($id)
+{
+    // Check if the user is authenticated
+    $user = Auth::user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    try {
+        // Retrieve the message by its ID
+        $message = Messagerie::with('user')->findOrFail($id);
+
+        // Check if the message belongs to the authenticated user
+        if ($message->user_id !== $user->id && !$user->hasAnyRole(['admin', 'superadmin'])) {
+            return response()->json(['message' => 'You do not have permission to view this message.'], 403);
+        }
+
+        // Return the message details
+        return response()->json([
+            'message' => 'Message retrieved successfully.',
+            'data' => $message
+        ], 200);
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json(['error' => 'Message not found.'], 404);
+    } catch (\Exception $e) {
+        // Log the error for further debugging
+        Log::error('Error retrieving message: ' . $e->getMessage());
+        return response()->json(['error' => 'An error occurred while retrieving the message.'], 500);
+    }
 }
+public function getConversationWithUser($userId)
+{
+    $authUser = Auth::user();
+
+    if (!$authUser) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    // Fetch messages between the authenticated user and the specified user
+    $messages = Messagerie::where(function ($query) use ($authUser, $userId) {
+            $query->where('user_id', $authUser->id)
+                  ->orWhere('user_id', $userId);
+        })
+        ->with('user:id,user_name,user_image') // Assuming the user relationship is defined in Messagerie model
+        ->orderBy('created_at', 'asc') // Order messages by creation date
+        ->get();
+
+    return response()->json($messages);
+}
+
+
 
 }

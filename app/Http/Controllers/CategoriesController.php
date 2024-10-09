@@ -15,10 +15,25 @@ use Illuminate\Http\Request;
 
 
         // Afficher toutes les catégories
-        public function index()
+        public function index(Request $request)
         {
-            $categories = Categories::all();
-            return response()->json($categories);
+            $search = $request->input('search');
+            $perPage = $request->input('perPage', 10); // Par défaut, 10 éléments par page
+            $categoriesQuery = Categories::query();
+
+            // Appliquer la recherche si elle est présente
+            if ($search) {
+                $categoriesQuery->where('name', 'like', '%' . $search . '%');
+            }
+
+            $categories = $categoriesQuery->paginate($perPage);
+
+            return response()->json([
+                'data' => $categories->items(),
+                'currentPage' => $categories->currentPage(),
+                'totalPages' => $categories->lastPage(),
+                'totalItems' => $categories->total(),
+            ]);
         }
 
         // Afficher une seule catégorie
@@ -30,16 +45,26 @@ use Illuminate\Http\Request;
 
         // Enregistrer une nouvelle catégorie
         public function store(Request $request)
-        {     $user = Auth::user();
+        {
+            // Check if the user is authenticated and has the required roles
+            $user = Auth::user();
             $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
             if (!$user || !$user->hasAnyRole($roles)) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
-            $categorie = Categories::create($request->all());
+
+            // Validate the incoming request data
+            $validatedData = $request->validate([
+                'nom' => 'required|string|max:255', // Make sure 'nom' is required
+            ]);
+
+            // Create the category using the validated data
+            $categorie = Categories::create($validatedData);
+
+            // Return the created category with a success response
             return response()->json($categorie, 201);
         }
-
         // Mettre à jour une catégorie
         public function update(Request $request, $id)
         {     $user = Auth::user();

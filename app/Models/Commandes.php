@@ -11,12 +11,12 @@ class Commandes extends Model
 
     protected $table='commandes';
     protected $fillable = [
-        'user_id', 'panier_id','monatant_total', 'statut','paiement_id','methode_paiement'
+        'user_id', 'panier_id','montant_total', 'statut','paiement_id','methode_paiement'
     ];
 
     public function user()
     {
-        return $this->belongsTo(Users::class);
+        return $this->belongsTo(User::class);
     }
 
     public function paniers()

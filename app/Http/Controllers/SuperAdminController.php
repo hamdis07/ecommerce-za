@@ -89,20 +89,20 @@ class SuperAdminController extends Controller
         return response()->json(['message' => 'Unauthorized'], 403);
     }
     $rules = [
-        'nom' => 'sometimes|string|max:255',
-        'prenom' => 'sometimes|string|max:255',
-        'genre' => 'sometimes|string|in:Male,Female,Other,femme,homme,autre',
-        'date_de_naissance' => 'sometimes|date',
-        'addresse' => 'sometimes|string|max:255',
-        'occupation' => 'sometimes|string|max:255',
-        'etat_social' => 'sometimes|string|max:255',
-        'numero_telephone' => 'sometimes|string|max:255',
-        'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
-        'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
+        'nom' => 'nullable|string|max:255',
+        'prenom' => 'nullable|string|max:255',
+        'genre' => 'nullable|string|in:Male,Female,Other,femme,homme,autre',
+        'date_de_naissance' => 'nullable|date',
+        'addresse' => 'nullable|string|max:255',
+        'occupation' => 'nullable|string|max:255',
+        'etat_social' => 'nullable|string|max:255',
+        'numero_telephone' => 'nullable|string|max:255',
+        'user_name' => 'nullable|string|max:255|unique:users,user_name,' . $id,
+        'email' => 'nullable|string|email|max:255|unique:users,email,' . $id,
         'password' => 'nullable|string|min:8',
         'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        'role' => 'sometimes|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing',
-        'status' => 'sometimes|string|in:actif,non actif,en attente,bloqué',
+        'role' => 'nullable|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing',
+        'status' => 'nullable|string|in:actif,non actif,en attente,bloqué',
     ];
 
     try {
@@ -258,6 +258,9 @@ public function rechercheradmin(Request $request)
     if ($request->has('numero_telephone')) {
         $query->where('numero_telephone', 'like', '%' . $request->numero_telephone . '%');
     }
+    if ($request->has('user_name')) {
+        $query->where('user_name', 'like', '%' . $request->user_name . '%');
+    }
 
     $utilisateurs = $query->get();
 
@@ -336,6 +339,7 @@ public function getUsersByRole(Request $request)
          'total_items' => $admins->total()
      ]);
  }
+
  public function updateAdminStatus(Request $request, $id)
 {   $user = Auth::user();
     $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
@@ -622,30 +626,59 @@ public function searchByUsernameclient(Request $request)
     return response()->json(['user' => $user]);
 }
 
- public function rechercherclient(Request $request)
-{   $user = Auth::user();
+public function rechercherclient(Request $request)
+{
+    $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    // Check if the user is authorized
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
+    // Initialize the query
+    $query = User::query();
+
+    // Apply filters if provided
+    if ($request->filled('nom')) {
+        $query->where('nom', 'like', '%' . $request->input('nom') . '%');
+    }
+    if ($request->filled('user_name')) {
+        $query->where('user_name', 'like', '%' . $request->input('user_name') . '%');
+    }
+    if ($request->filled('prenom')) {
+        $query->where('prenom', 'like', '%' . $request->input('prenom') . '%');
+    }
+    if ($request->filled('numero_telephone')) {
+        $query->where('numero_telephone', 'like', '%' . $request->input('numero_telephone') . '%');
+    }
+
+    // Execute the query and get results
+    $clients = $query->get();
+
+    // Return results as JSON
+    return response()->json($clients);
+}
+
+public function getUsers(Request $request)
+{ $user = Auth::user();
     $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
     if (!$user || !$user->hasAnyRole($roles)) {
         return response()->json(['message' => 'Unauthorized'], 403);
     }
-    $query = User::query();
+    // Optionally, you can filter users by role using the `role` query parameter
+    $role = $request->query('role');
 
-    if ($request->has('nom')) {
-        $query->where('nom', 'like', '%' . $request->nom . '%');
+    if ($role) {
+        // Use Spatie's `role` method to filter users by role
+        $users = User::role($role)->get();
+    } else {
+        // Get all users if no role is specified
+        $users = User::all();
     }
 
-    if ($request->has('prenom')) {
-        $query->where('prenom', 'like', '%' . $request->prenom . '%');
-    }
-
-    if ($request->has('numero_telephone')) {
-        $query->where('numero_telephone', 'like', '%' . $request->numero_telephone . '%');
-    }
-
-    $clients = $query->get();
-
-    return response()->json($clients);
+    return response()->json($users);
 }
 
 

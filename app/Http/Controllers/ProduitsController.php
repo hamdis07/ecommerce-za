@@ -88,21 +88,30 @@ class ProduitsController extends Controller
             $produit->save();
 
             \Log::info('Produit sauvegardé avec ID: ' . $produit->id);
+            if ($request->hasFile('images')) {
+                $images = $request->file('images');
 
-            if ($request->has('images') && is_array($request->images)) {
-                foreach ($request->file('images') as $imageFile) {
-                    $imageName = time() . '_' . $imageFile->getClientOriginalName();
-                    $imagePath = $imageFile->move(public_path('images'), $imageName);
-                    $imageUrl = asset('images/' . $imageName); // Assurez-vous que le chemin est correct
-                    \Log::info('Image sauvegardée: ' . $imageUrl); // Vérifiez si l'URL est correcte
+                // Vérifiez si c'est bien un tableau
+                if (is_array($images)) {
+                    foreach ($images as $imageFile) {
+                        if ($imageFile->isValid()) {
+                            $imageName = time() . '_' . $imageFile->getClientOriginalName();
+                            $imagePath = $imageFile->move(public_path('images'), $imageName);
+                            $imageUrl = asset('images/' . $imageName);
 
-                    Images::create([
-                        'chemin_image' => $imageUrl,
-                        'produit_id' => $produit->id
-                    ]);
-                }
-            }
+                            \Log::info('Image sauvegardée: ' . $imageUrl);
 
+                            Images::create([
+                                'chemin_image' => $imageUrl,
+                                'produit_id' => $produit->id
+                            ]);
+                        } else {
+                            \Log::warning('Fichier image invalide.');
+                        }
+                    }
+                } else {
+                    \Log::warning('Le champ images n\'est pas un tableau.');
+                }}
             if ($request->hasFile('image_url')) {
                 $video = $request->file('image_url');
                 $videoName = time() . '_' . $video->getClientOriginalName();
@@ -217,15 +226,17 @@ class ProduitsController extends Controller
            // \Log::info('Début de la mise à jour du produit');
 
             // Mise à jour des attributs du produit
-            $produit->update($request->only([
-                'references',
-                'nom_produit',
-                'description',
-                'composition',
-                'entretien',
-                'prix_initial',
-                'mots_cles'
-            ]));
+            $produit->update([
+                'references' => $request->input('references', $produit->references),
+                'nom_produit' => $request->input('nom_produit', $produit->nom_produit),
+                'description' => $request->input('description', $produit->description),
+                'composition' => $request->input('composition', $produit->composition),
+                'entretien' => $request->input('entretien', $produit->entretien),
+                'prix_initial' => $request->input('prix_initial', $produit->prix_initial),
+                'prix' => $request->input('prix_initial', $produit->prix_initial), // Set 'prix' to 'prix_initial'
+                'image_url' => $request->input('image_url', $produit->image_url),
+                'mots_cles' => $request->input('mots_cles', $produit->mots_cles),
+            ]);
 
             // Assignation des IDs de genre, catégorie et sous-catégorie si fournis
             if ($request->has('genre')) {
@@ -364,58 +375,70 @@ class ProduitsController extends Controller
          return response()->json(['error' => $e->getMessage()], 500);
      }
  }
- public function afficherTousLesProduits()
-    { $user = Auth::user();
-        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+ public function afficherTousLesProduits(Request $request)
+{
+    $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
-        if (!$user || !$user->hasAnyRole($roles)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-        try {
-            $produits = Produits::with([
-                'quantitedisponible.magasin',
-                'quantitedisponible.tailles',
-                'quantitedisponible.couleurs',
-                'images',
-                'categories',
-                'genre',
-                'souscategories'
-            ])->get();
-
-            $produitsAvecDetails = $produits->map(function ($produit) {
-                $quantites = $produit->quantitedisponible ? $produit->quantitedisponible->map(function ($quantite) {
-                    return [
-                        'magasin' => $quantite->magasin->nom ?? null,
-                        'quantite' => $quantite->quantite,
-                        'taille' => $quantite->tailles->nom ?? null,
-                        'couleur' => $quantite->couleurs->nom ?? null,
-                    ];
-                }) : [];
-
-                $images = $produit->images ? $produit->images->map(function ($image) {
-                    return [
-                        'url' => asset('storage/app/public/videos' . $image->chemin_image), // Utilisation de asset() pour obtenir le chemin complet
-                        'alt' => $image->alt_text ?? 'Image du produit', // Assurez-vous d'avoir un champ alt_text ou définissez un texte par défaut
-                    ];
-                }) : [];
-    ;
-
-
-                return [
-                    'produit' => $produit,
-                    'categories' => $produit->categories ? $produit->categories->nom : 'Non spécifié',
-                    'souscategories' => $produit->souscategories ? $produit->souscategories->nom : 'Non spécifié',
-                    'genre' => $produit->genre ? $produit->genre->nom : 'Non spécifié',
-                    'quantites' => $quantites,
-                    'images' => $images
-                ];
-            });
-
-            return response()->json(['produits' => $produitsAvecDetails], 200);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
+
+    try {
+        // Get the page size from the request, or use a default of 10
+        $perPage = $request->input('per_page', 10);
+
+        // Get paginated products
+        $produits = Produits::with([
+            'quantitedisponible.magasin',
+            'quantitedisponible.tailles',
+            'quantitedisponible.couleurs',
+            'images',
+            'categories',
+            'genre',
+            'souscategories'
+        ])->paginate($perPage); // Apply pagination
+
+        // Map the products and related details
+        $produitsAvecDetails = $produits->map(function ($produit) {
+            $quantites = $produit->quantitedisponible ? $produit->quantitedisponible->map(function ($quantite) {
+                return [
+                    'magasin' => $quantite->magasin->nom ?? null,
+                    'quantite' => $quantite->quantite,
+                    'taille' => $quantite->tailles->nom ?? null,
+                    'couleur' => $quantite->couleurs->nom ?? null,
+                ];
+            }) : [];
+
+            $images = $produit->images ? $produit->images->map(function ($image) {
+                return [
+                    'url' => asset('storage/app/public/videos' . $image->chemin_image), // Full image path
+                    'alt' => $image->alt_text ?? 'Image du produit', // Default alt text
+                ];
+            }) : [];
+
+            return [
+                'produit' => $produit,
+                'categories' => $produit->categories ? $produit->categories->nom : 'Non spécifié',
+                'souscategories' => $produit->souscategories ? $produit->souscategories->nom : 'Non spécifié',
+                'genre' => $produit->genre ? $produit->genre->nom : 'Non spécifié',
+                'quantites' => $quantites,
+                'images' => $images
+            ];
+        });
+
+        // Return paginated data including products and pagination metadata
+        return response()->json([
+            'produits' => $produitsAvecDetails,
+            'current_page' => $produits->currentPage(),
+            'total_pages' => $produits->lastPage(),
+            'total_items' => $produits->total()
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
 
  public function afficherTousLesProduitspageclient(Request $request)
  {
@@ -479,15 +502,19 @@ class ProduitsController extends Controller
             'categorie' => $categorie,
             'produit' => $produits,
         ]);}
-    public function produitsParGenre($genreId)
-    {
-        $genre = Genre::find($genreId);
-        $produits = Produits::where('genre_id', $genreId)->get();
-        return response()->json([
-            'genre' => $genre,
-            'produits' => $produits,
-        ]);
-    }
+        public function produitsParGenre($genreId)
+        {
+            $genre = Genre::find($genreId);
+            $produits = Produits::where('genre_id', $genreId)
+                                ->with(['categories', 'sousCategories', 'images']) // Include related categories, subcategories, and images
+                                ->get();
+
+            return response()->json([
+                'genre' => $genre,
+                'produits' => $produits,
+            ]);
+        }
+
     public function produitsParGenreEtCategorie($genreId, $categorieId)
     {
         $genre = Genre::find($genreId);
@@ -785,6 +812,16 @@ public function removePromos($idProduit)
             'prix' => $prixInitial,
         ], 404);
     }
+}
+public function getPromos()
+{$user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+    $promotions = Promos::all();
+    return response()->json($promotions, 200);
 }
 
 
