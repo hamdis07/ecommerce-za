@@ -321,9 +321,16 @@ class ProduitsController extends Controller
 
             // Traitement de la promotion
             if ($request->has('promo')) {
+                $promoData = [
+                    'nom' => $request->input('promo.nom'),
+                    'pourcentage_reduction' => $request->input('promo.pourcentage_reduction'),
+                    'date_debut' => $request->input('promo.date_debut'),
+                    'date_fin' => $request->input('promo.date_fin'),
+                ];
+
                 $promotion = Promos::updateOrCreate(
                     ['id' => $produit->promo_id ?? null],
-                    $request->promo
+                    $promoData
                 );
 
                 $produit->promo_id = $promotion->id;
@@ -388,7 +395,7 @@ class ProduitsController extends Controller
         // Get the page size from the request, or use a default of 10
         $perPage = $request->input('per_page', 10);
 
-        // Get paginated products
+        // Get paginated products ordered by creation date (most recent first)
         $produits = Produits::with([
             'quantitedisponible.magasin',
             'quantitedisponible.tailles',
@@ -397,7 +404,9 @@ class ProduitsController extends Controller
             'categories',
             'genre',
             'souscategories'
-        ])->paginate($perPage); // Apply pagination
+        ])
+        ->orderBy('created_at', 'desc') // Order by creation date descending
+        ->paginate($perPage); // Apply pagination
 
         // Map the products and related details
         $produitsAvecDetails = $produits->map(function ($produit) {
@@ -439,6 +448,7 @@ class ProduitsController extends Controller
         return response()->json(['error' => $e->getMessage()], 500);
     }
 }
+
 
  public function afficherTousLesProduitspageclient(Request $request)
  {
@@ -934,6 +944,52 @@ public function unhideProduct($idProduit)
 
 
 
+public function filterProduits(Request $request)
+{
+    // Commencez par une requête de base
+    $query = Produits::query();
+
+    // Filtrage par sous-catégorie (si fourni)
+    if ($request->has('souscategorie_id')) {
+        $query->searchBySousCategorie($request->input('souscategorie_id'));
+    }
+
+    // Filtrage par catégorie (si fourni)
+    if ($request->has('categorie_id')) {
+        $query->filterByCategory($request->input('categorie_id'));
+    }
+
+    // Filtrage par genre (si fourni)
+    if ($request->has('genre_id')) {
+        $query->filterByGenre($request->input('genre_id'));
+    }
+
+    // Filtrage par mots-clés (si fourni)
+    if ($request->has('keyword')) {
+        $query->filterByKeyword($request->input('keyword'));
+    }
+
+    // Filtrage par nouveauté (si spécifié)
+    if ($request->has('new') && $request->input('new') == true) {
+        $query->filterByNew();
+    }
+
+    // Filtrage par promotion (si demandé)
+    if ($request->has('promo') && $request->input('promo') == true) {
+        $query->filterByPromo();
+    }
+
+    // Filtrage par popularité (produits les plus commandés, si spécifié)
+    if ($request->has('popular') && $request->input('popular') == true) {
+        $query->filterByPopularity();
+    }
+
+    // Exécution de la requête et récupération des résultats
+    $produits = $query->get();
+
+    // Si vous voulez une réponse JSON
+    return response()->json(['produits' => $produits], 200);
+}
 
 
 }

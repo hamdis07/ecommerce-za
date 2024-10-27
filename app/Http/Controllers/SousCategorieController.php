@@ -45,7 +45,6 @@ class SousCategorieController extends Controller
 
     public function update(Request $request, $id)
     {
-        // Authentification de l'utilisateur
         $user = Auth::user();
         $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
@@ -54,16 +53,13 @@ class SousCategorieController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Validation des champs
         $request->validate([
             'nom' => 'required|string',
             'categorie_nom' => 'nullable|string', // Validation pour le nom de la catégorie
         ]);
 
-        // Initialiser l'ID de la catégorie
         $categorieId = null;
 
-        // Vérifiez si le champ categorie_nom est rempli
         if ($request->filled('categorie_nom')) {
             // Récupérer ou créer la catégorie par son nom
             $categorie = Categories::firstOrCreate(
@@ -88,13 +84,10 @@ class SousCategorieController extends Controller
 
     public function index(Request $request)
     {
-        // Get the number of items per page from the query string, default to 10
         $perPage = $request->input('per_page', 10);
 
-        // Get the page number from the query string, default to 1
         $currentPage = $request->input('page', 1);
 
-        // Fetch categories with their subcategories, using pagination
         $categories = Categories::with('sousCategories')
             ->paginate($perPage);
 
@@ -108,7 +101,6 @@ class SousCategorieController extends Controller
     }
     public function index1(Request $request)
     {
-        // Fetch all categories with their corresponding subcategories
         $categories = Categories::with('sousCategories')->get();
 // dd();
         return response()->json([

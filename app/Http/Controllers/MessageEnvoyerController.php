@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;  // Correct import for JsonResponse
 
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -15,6 +16,32 @@ use App\Models\Messagerie;
 
 class MessageEnvoyerController extends Controller
 {
+    public function getMessagesReceived()
+    {
+        $user = Auth::user();
+
+        // Vérifier si l'utilisateur est authentifié
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Récupérer les messages envoyés par l'utilisateur connecté
+        $messages = MessageEnvoyer::with([ 'user:id,user_name,user_image']) // Récupérer les réponses et les détails de l'utilisateur
+            ->where('user_id', $user->id) // Filtrer les messages par ID utilisateur
+            ->get();
+
+        if ($messages->isEmpty()) {
+            return response()->json(['message' => 'No messages found.'], 409);
+        }
+
+        $messages->each(function ($message) {
+            $message->user_name = $message->user->user_name; // Ajouter le nom de l'utilisateur
+            $message->user_image = $message->user->user_image; // Ajouter l'image de l'utilisateur
+            unset($message->user); // Optionnel : enlever la relation 'user' pour nettoyer la réponse
+        });
+
+        return response()->json($messages);
+    }
         public function showMessage($id)
     {  $user = Auth::user();
 
@@ -24,62 +51,133 @@ class MessageEnvoyerController extends Controller
         $message = Messagerie::with('user')->findOrFail($id);
         return response()->json($message);
     }
+    public function contactAdmin(Request $request)
+{
+    $request->validate([
+        'objet' => 'required|string|max:255',
+        'content' => 'required|string',
+        'file.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
+    ]);
 
-    // Répondre à un message
-    public function replyToMessage(Request $request, $idMessage)
-    {
-        // Vérifier si l'utilisateur est authentifié
-        if (!Auth::check()) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+    $user = Auth::user();
+    if (!$user) {
+        return response()->json(['message' => 'Non autorisé'], 401);
         }
 
-        $user = Auth::user();
-
-        // Valider la requête entrante
-        $request->validate([
-            'content' => 'required|string',
-            'file' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:2048',
-        ]);
-
-        try {
-            // Trouver le message original
-            $message = Messagerie::findOrFail($idMessage);
-
-            // Vérifier si le message appartient à l'utilisateur authentifié
-            if ($message->user_id !== $user->id) {
-                return response()->json(['error' => 'You can only reply to your own messages.'], 403);
+        if ($user->status === 'bloqué') {
+            return response()->json(['message' => 'Votre compte est bloqué. Vous ne pouvez pas contacter l\'admin.'], 403);
             }
 
-            // Créer la réponse
-            $reply = new MessageEnvoyer([
+            // Créer un nouveau message pour contacter l'admin
+            $message = new Messagerie([
                 'user_id' => $user->id,
-                'message_id' => $message->id, // Associer au message original
-                'content' => $request->content,
-            ]);
+                'objet' => $request->objet,
+                'nom' => $user->nom,
+                'prenom' => $user->prenom,
+                'telephone' => $user->numero_telephone,
+                'email' => $user->email,
+                'sujet' => 'Contact',
+                'description' => $request->content,
+                'attachments'=>$request->file,
+                ]);
 
-            // Gérer les fichiers joints
-            if ($request->hasFile('file')) {
-                $filePath = $request->file('file')->store('uploads', 'public');
-                $reply->file_path = $filePath; // Enregistrer le chemin du fichier
+                // Gérer les fichiers joints
+                // dd($request->hasFile('file'));
+                if ($request->hasFile('file')) {
+                    $filePaths = [];
+                    // Log de débogage pour voir les fichiers reçus
+                    foreach ($request->file('file') as $file) {
+                        // Vérifiez que le fichier est bien un UploadedFile avant de logger
+                        if ($file instanceof \Illuminate\Http\UploadedFile) {
+                            \Log::info('Fichier reçu: ', [
+                                'name' => $file->getClientOriginalName(),
+                                'size' => $file->getSize(),
+                                'mime' => $file->getMimeType(),
+                                ]);
+                                }
+                                }
+
+                                // Récupérer les fichiers envoyés
+                                $files = $request->file('file');
+
+                                // Vérifier si $files est un tableau
+                                if (is_array($files)) {
+                                    foreach ($files as $file) {
+                                        // Vérifier si le fichier est valide
+                                        if ($file->isValid()) {
+                                            // Créer un nom de fichier unique
+                                            $fileName = time() . '_' . $file->getClientOriginalName();
+                                            // Déplacer le fichier vers le répertoire public/messages
+                                            $filePath = $file->move(public_path('messages'), $fileName);
+                                            // Créer l'URL du fichier
+                                            $fileUrl = asset('messages/' . $fileName);
+                                            // Ajouter l'URL au tableau
+                    $filePaths[] = $fileUrl;
+                    // Journaliser l'URL du fichier sauvegardé
+                    \Log::info('Fichier sauvegardé: ' . $fileUrl);
+                } else {
+                    \Log::warning('Le fichier n\'est pas valide: ' . $file->getClientOriginalName());
+                }
             }
 
-            // Sauvegarder la réponse
-            $reply->save();
-
-            // Mettre à jour le message original pour indiquer qu'il a été répondu
-            $message->update(['replied' => true]);
-
-            return response()->json([
-                'message' => 'Réponse ajoutée avec succès au message.',
-                'reply' => $reply
-            ], 200);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json(['error' => 'Message not found.'], 404);
-        } catch (\Exception $e) {
-            Log::error('Error replying to message: ' . $e->getMessage());
-            return response()->json(['error' => 'Une erreur s\'est produite lors de l\'ajout de la réponse au message.'], 500);
+            // Vérifier si le tableau des chemins n'est pas vide avant de l'encoder
+            if (!empty($filePaths)) {
+                // Convertir les chemins des fichiers en JSON
+                $message->attachments = json_encode($filePaths);
+            } else {
+                \Log::warning('Aucun fichier n\'a été sauvegardé.');
+            }
+        } else {
+            \Log::warning('Le fichier n\'est pas un tableau.');
         }
     }
+
+    // Sauvegarder le message
+    $message->save();
+
+    return response()->json('Message envoyé à l\'admin avec succès.', 200);
+}
+
+
+
+    public function replyToMessage(Request $request, $idMessage)
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Non autorisé'], 401);
+        }
+
+        $request->validate([
+            'content' => 'required|string',
+            'file.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
+        ]);
+
+        $message = Messagerie::find($idMessage);
+        if (!$message) {
+            return response()->json(['message' => 'Message introuvable'], 404);
+        }
+
+        $messageEnvoyer = new MessageEnvoyer([
+            'user_id' => $user->id,
+            'message_id' => $message->id,
+            'content' => $request->content,
+        ]);
+
+        if ($request->hasFile('file')) {
+            $filePaths = [];
+            foreach ($request->file('file') as $file) {
+                $filePath = $file->store('messages', 'public');
+                $filePaths[] = Storage::url($filePath);
+            }
+            $messageEnvoyer->attachments = json_encode($filePaths);
+        }
+
+        $messageEnvoyer->save();
+
+        return response()->json(['message' => 'Réponse envoyée avec succès.'], 200);
+    }
+
 
     // Supprimer un message
     public function deleteMessage($id)
@@ -147,6 +245,24 @@ public function getClients(Request $request)
         'current_page' => $clients->currentPage(),
         'total_pages' => $clients->lastPage(),
         'total_items' => $clients->total()
+    ]);
+}
+public function listAllUsers(Request $request)
+{
+    // Vérifiez les rôles de l'utilisateur authentifié (si vous voulez restreindre cette action aux administrateurs)
+    $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
+    // Récupérer tous les utilisateurs, peu importe leur rôle
+    $users = User::with('roles')->get(); // Inclure les rôles dans la réponse
+
+    // Retourner les données
+    return response()->json([
+        'data' => $users
     ]);
 }
 
@@ -262,13 +378,11 @@ public function getClients(Request $request)
         return response()->json(['message' => 'Unauthorized'], 403);
     }
 
-    // Valider les données entrantes
     $request->validate([
         'content' => 'required|string',
         'file.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
     ]);
 
-    // Convertir l'user_id en tableau si plusieurs IDs sont fournis
     $user_ids = explode(',', $user_id);
 
     foreach ($user_ids as $id) {
@@ -316,51 +430,6 @@ public function getClients(Request $request)
     return response()->json('Message envoyé aux clients avec succès.', 200);
 }
 
-    public function contactAdmin(Request $request)
-{
-    $request->validate([
-        'content' => 'required|string',
-        'file.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,pdf,doc,docx,xls,xlsx|max:2048',
-    ]);
-
-    $user = Auth::user();
-
-    if (!$user) {
-        return response()->json(['message' => 'Non autorisé'], 401);
-    }
-
-    if ($user->status === 'blocked') {
-        return response()->json(['message' => 'Votre compte est bloqué. Vous ne pouvez pas contacter l\'admin.'], 403);
-    }
-
-    // Créer un nouveau message pour contacter l'admin
-    $message = new Messagerie([
-        'user_id' => $user->id,
-        'objet' => 'Contact Admin',
-        'nom' => $user->nom,
-        'prenom' => $user->prenom,
-        'telephone' => $user->numero_telephone,
-        'email' => $user->email,
-        'sujet' => 'Contact',
-        'description' => $request->content,
-    ]);
-
-    // Gérer les fichiers joints
-    if ($request->hasFile('file')) {
-        $filePaths = [];
-        foreach ($request->file('file') as $file) {
-            // Enregistrer le fichier et récupérer son chemin
-            $path = $file->store('messages', 'public');
-            $filePaths[] = $path;
-        }
-        // Convertir les chemins des fichiers en JSON
-        $message->attachments = json_encode($filePaths);
-    }
-
-    $message->save();
-
-    return response()->json('Message envoyé à l\'admin avec succès.', 200);
-}
 
     public function blockUser($userId)
     {     $user = Auth::user();
@@ -459,6 +528,61 @@ public function getConversationWithUser($userId)
     return response()->json($messages);
 }
 
+public function getMessagesByUser($userId)
+{
+    $messages = Messagerie::getAllMessagesByUserId($userId);
 
+    return response()->json($messages);  // Retourner sous forme de JSON pour une API, ou l'envoyer à une vue
+}
+
+
+public function getUsersWithLastMessages(): JsonResponse
+{
+    // Get all users who have either sent or received a message
+    $usersWithLastMessages = User::with(['messageries' => function($query) {
+        // Fetch the last received message
+        $query->orderBy('created_at', 'desc');
+    }, 'messageEnvoyes' => function($query) {
+        // Fetch the last sent message
+        $query->orderBy('created_at', 'desc');
+    }])->get();
+
+    // Prepare the data to return, including the latest message (either sent or received)
+    $response = $usersWithLastMessages->map(function ($user) {
+        $lastReceivedMessage = $user->messageries->first();
+        $lastSentMessage = $user->messageEnvoyes->first();
+
+        // Determine which is the latest message
+        $latestMessage = $lastReceivedMessage && $lastSentMessage
+            ? ($lastReceivedMessage->created_at > $lastSentMessage->created_at ? $lastReceivedMessage : $lastSentMessage)
+            : ($lastReceivedMessage ?: $lastSentMessage);
+
+        // Determine message content based on the type of message
+        $lastMessageContent = null;
+        $messageType = null;
+
+        if ($latestMessage instanceof Messagerie) {
+            $lastMessageContent = $latestMessage->description; // Received message
+            $messageType = 'received';
+        } elseif ($latestMessage instanceof MessageEnvoyer) {
+            $lastMessageContent = $latestMessage->content; // Sent message
+            $messageType = 'sent';
+        }
+
+        return [
+            'user_id' => $user->id,
+            'user_name' => $user->user_name,
+            'user_image' => $user->user_image,
+            'last_message_content' => $lastMessageContent,
+            'last_message_time' => $latestMessage ? $latestMessage->created_at : null,
+            'message_type' => $messageType,
+        ];
+    });
+
+    // Sort the users by the timestamp of their latest message (most recent first)
+    $sortedResponse = $response->sortByDesc('last_message_time')->values();
+
+    return response()->json($sortedResponse);
+}
 
 }

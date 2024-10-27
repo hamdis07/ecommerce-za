@@ -97,5 +97,14 @@ public function isAdmin()
 
     return in_array($this->role, $allowedRoles);
 }
+public function messageries()
+{
+    return $this->hasMany(Messagerie::class, 'user_id');
+}
+
+public function messageEnvoyes()
+{
+    return $this->hasMany(MessageEnvoyer::class, 'user_id');
+}
 
 }

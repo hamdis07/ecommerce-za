@@ -65,213 +65,407 @@ class CommandesController extends Controller
     $config = \App\Models\Configuration::where('key', 'frais_livraison')->first();
     return $config ? $config->value : 0.00; // Retourne 0 si la configuration n'existe pas
 }
+public function commander(Request $request)
+{
+    $user = Auth::user();
+    if (!$user) {
+        return response()->json(['message' => 'Vous devez être connecté pour passer une commande'], 401);
+    }
 
-    public function commander(Request $request)
-    {
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json(['message' => 'Vous devez être connecté pour passer une commande'], 401);
+    // Validation des données entrantes
+    $validator = \Validator::make($request->all(), [
+        'adresse' => 'required|string|max:255',
+        'ville' => 'required|string|max:255',
+        'code_postal' => 'required|string|max:10',
+        'telephone' => 'required|string|max:20',
+        'description' => 'nullable|string',
+        'methode_paiement' => 'required|string|in:apres_livraison,par_carte',
+        'stripeToken' => 'required_if:methode_paiement,par_carte|string',
+        'numero_carte' => 'required_if:methode_paiement,par_carte|string|max:20',
+        'nom_detenteur_carte' => 'required_if:methode_paiement,par_carte|string|max:255',
+        'mois_validite' => 'required_if:methode_paiement,par_carte|integer|min:1|max:12',
+        'annee_validite' => 'required_if:methode_paiement,par_carte|integer|min:' . date('Y'),
+        'code_secret' => 'required_if:methode_paiement,par_carte|string|max:4',
+        'adresse_facturation' => 'required_if:methode_paiement,par_carte|string|max:255',
+        'produits' => 'required|array',
+        'produits.*.id' => 'required|integer|exists:produits,id',
+        'produits.*.quantite' => 'required|integer|min:1',
+        'produits.*.taille' => 'required|string',
+        'produits.*.couleur' => 'required|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json(['errors' => $validator->errors()], 400);
+    }
+
+    $validatedData = $validator->validated();
+    $panier = Paniers::where('user_id', $user->id)->first();
+
+    if (!$panier || $panier->produits->isEmpty()) {
+        return response()->json(['message' => 'Votre panier est vide'], 400);
+    }
+
+    $produitsPanier = $panier->produits()->get()->keyBy('produit_id');
+    $produitsCommandeCollection = collect($validatedData['produits']);
+    $montantTotalProduits = 0;
+
+    foreach ($validatedData['produits'] as $produitCommande) {
+        $produit = Produits::find($produitCommande['id']);
+        $taille = Tailles::where('nom', $produitCommande['taille'])->first();
+        $couleur = Couleurs::where('nom', $produitCommande['couleur'])->first();
+
+        $quantiteDisponible = Quantitedisponible::where('produits_id', $produitCommande['id'])
+            ->where('tailles_id', $taille->id)
+            ->where('couleurs_id', $couleur->id)
+            ->first();
+
+        if (!$quantiteDisponible || $produitCommande['quantite'] > $quantiteDisponible->quantite) {
+            return response()->json(['message' => 'Quantité non disponible pour ce produit'], 400);
         }
 
-        $validator = \Validator::make($request->all(), [
-            'adresse' => 'required|string|max:255',
-            'ville' => 'required|string|max:255',
-            'code_postal' => 'required|string|max:10',
-            'telephone' => 'required|string|max:20',
-            'description' => 'nullable|string',
-            'methode_paiement' => 'required|string|in:apres_livraison,par_carte',
-            'stripeToken' => 'required_if:methode_paiement,par_carte|string',
-            'numero_carte' => 'required_if:methode_paiement,par_carte|string|max:20',
-            'nom_detenteur_carte' => 'required_if:methode_paiement,par_carte|string|max:255',
-            'mois_validite' => 'required_if:methode_paiement,par_carte|integer|min:1|max:12',
-            'annee_validite' => 'required_if:methode_paiement,par_carte|integer|min:' . date('Y'),
-            'code_secret' => 'required_if:methode_paiement,par_carte|string|max:4',
-            'adresse_facturation' => 'required_if:methode_paiement,par_carte|string|max:255',
-            'produits' => 'required|array',
-            'produits.*.id' => 'required|integer|exists:produits,id',
-            'produits.*.quantite' => 'required|integer|min:1',
-            'produits.*.taille' => 'required|string',
-            'produits.*.couleur' => 'required|string',
+        $prixTotalProduit = $produit->prix * $produitCommande['quantite'];
+        $montantTotalProduits += $prixTotalProduit;
+
+        // Mise à jour ou ajout dans le panier
+        if (isset($produitsPanier[$produitCommande['id']])) {
+            $produitPanier = $produitsPanier[$produitCommande['id']];
+            $nouvelleQuantite = $produitPanier->pivot->quantite + $produitCommande['quantite'];
+
+            if ($nouvelleQuantite > $quantiteDisponible->quantite) {
+                return response()->json(['message' => 'Quantité totale demandée dépasse la disponibilité'], 400);
+            }
+
+            $panier->produits()->updateExistingPivot($produitCommande['id'], [
+                'quantite' => $nouvelleQuantite,
+                'taille' => $taille->nom,
+                'couleur' => $couleur->nom,
+                'prix_total' => $prixTotalProduit
+            ]);
+        } else {
+            $panier->produits()->attach($produitCommande['id'], [
+                'taille' => $taille->nom,
+                'couleur' => $couleur->nom,
+                'quantite' => $produitCommande['quantite'],
+                'prix_total' => $prixTotalProduit
+            ]);
+        }
+    }
+
+    // Ajout des frais de livraison
+    $fraisLivraison = $this->obtenirFraisLivraison();
+    $montantTotal = $montantTotalProduits + $fraisLivraison;
+
+    DB::beginTransaction();
+
+    try {
+        $commande = Commandes::create([
+            'user_id' => $user->id,
+            'montant_total' => $montantTotal,
+            'statut' => 'en attente',
+            'paiement_id' => null,
+            'methode_paiement' => $request->methode_paiement,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
+        LivraisonDetails::create([
+            'user_id' => $user->id,
+            'commandes_id' => $commande->id,
+            'adresse' => $request->adresse,
+            'ville' => $request->ville,
+            'code_postal' => $request->code_postal,
+            'telephone' => $request->telephone,
+            'description' => $request->description,
+        ]);
+
+        if ($request->methode_paiement === 'par_carte') {
+            Stripe::setApiKey(env('STRIPE_SECRET'));
+
+            $charge = Charge::create([
+                'amount' => $montantTotal * 100,
+                'currency' => 'eur',
+                'source' => $request->stripeToken,
+                'description' => 'Paiement de la commande',
+            ]);
+            $livraisonDetail = LivraisonDetails::where('commandes_id', $commande->id)->first();
+
+            $paiement = Paiements::create([
+                'user_id' => $user->id,
+                'commandes_id' => $commande->id,
+                'livraisondetails_id' => $livraisonDetail->id, // Assurez-vous que ce champ est bien rempli
+
+                'methode_paiement' => $request->methode_paiement,
+                'numero_carte' => $request->numero_carte,
+                'nom_detenteur_carte' => $request->nom_detenteur_carte,
+                'mois_validite' => $request->mois_validite,
+                'annee_validite' => $request->annee_validite,
+                'code_secret' => $request->code_secret,
+                'adresse_facturation' => $request->adresse_facturation,
+                'prix_total' => $montantTotal,
+            ]);
+
+            $commande->update(['paiement_id' => $paiement->id]);
         }
-
-        $validatedData = $validator->validated();
-        $panier = Paniers::where('user_id', $user->id)->first();
-
-        if (!$panier) {
-            return response()->json(['message' => 'Votre panier est vide'], 400);
-        }
-
-        $produitsPanier = $panier->produits()->get()->keyBy('produit_id');
-
-        $produitsCommandeCollection = collect($validatedData['produits']);
 
         foreach ($validatedData['produits'] as $produitCommande) {
             $produit = Produits::find($produitCommande['id']);
-            if (!$produit) {
-                return response()->json(['message' => "Le produit avec l'ID {$produitCommande['id']} n'existe pas"], 400);
-            }
-
-            $taille = Tailles::where('nom', $produitCommande['taille'])->first();
-            if (!$taille) {
-                return response()->json(['message' => 'La taille spécifiée n\'est pas valide pour ce produit'], 400);
-            }
-
-            $couleur = Couleurs::where('nom', $produitCommande['couleur'])->first();
-            if (!$couleur) {
-                return response()->json(['message' => 'La couleur spécifiée n\'est pas valide pour ce produit'], 400);
-            }
+            $commande->produits()->attach($produitCommande['id'], [
+                'quantite' => $produitCommande['quantite'],
+                'taille' => $produitCommande['taille'],
+                'couleur' => $produitCommande['couleur'],
+                'prix_total' => $produit->prix * $produitCommande['quantite'],
+            ]);
 
             $quantiteDisponible = Quantitedisponible::where('produits_id', $produitCommande['id'])
                 ->where('tailles_id', $taille->id)
                 ->where('couleurs_id', $couleur->id)
                 ->first();
 
-            if (!$quantiteDisponible || $produitCommande['quantite'] <= 0 || $produitCommande['quantite'] > $quantiteDisponible->quantite) {
-                return response()->json(['message' => 'La quantité spécifiée n\'est pas disponible pour ce produit'], 400);
-            }
-
-            $prixTotal = $produit->prix * $produitCommande['quantite'];
-
-            if (isset($produitsPanier[$produitCommande['id']])) {
-                $produitPanier = $produitsPanier[$produitCommande['id']];
-                $nouvelleQuantite = $produitPanier->pivot->quantite + $produitCommande['quantite'];
-
-                if ($nouvelleQuantite > $quantiteDisponible->quantite) {
-                    return response()->json(['message' => 'La quantité totale demandée dépasse la quantité disponible en stock'], 400);
-                }
-
-                $panier->produits()->updateExistingPivot($produitCommande['id'], [
-                    'quantite' => $nouvelleQuantite,
-                    'taille' => $taille->nom,
-                    'couleur' => $couleur->nom,
-                    'prix_total' => $prixTotal
-                ]);
-            } else {
-                $panier->produits()->attach($produitCommande['id'], [
-                    'taille' => $taille->nom,
-                    'couleur' => $couleur->nom,
-                    'quantite' => $produitCommande['quantite'],
-                    'prix_total' => $prixTotal
-                ]);
-            }
+            $quantiteDisponible->decrement('quantite', $produitCommande['quantite']);
         }
+        $idsProduitsCommandes = $produitsCommandeCollection->pluck('id')->toArray();
+                foreach ($panier->produits as $produitDansPanier) {
+                    if (!in_array($produitDansPanier->id, $idsProduitsCommandes)) {
+                        continue;
+                    }
 
-        $montantTotalProduits = $panier->produits->sum(function ($produit) {
-            return $produit->pivot->prix_total;
-        });
+                    $produitCommande = $produitsCommandeCollection->firstWhere('id', $produitDansPanier->id);
+                    $quantiteRestante = $produitDansPanier->pivot->quantite - $produitCommande['quantite'];
 
-        $fraisLivraison = $this->obtenirFraisLivraison();
-
-        $montantTotal = $montantTotalProduits + $fraisLivraison;
-
-
-        DB::beginTransaction();
-
-        try {
-            $commande = Commandes::create([
-                'user_id' => $user->id,
-                'montant_total' => $montantTotal,
-                'statut' => 'en attente',
-                'paiement_id' => null,
-                'methode_paiement' => $request->methode_paiement,
-            ]);
-
-            $livraisonDetails = LivraisonDetails::create([
-                'user_id' => $user->id,
-                'commandes_id' => $commande->id,
-                'adresse' => $request->adresse,
-                'ville' => $request->ville,
-                'code_postal' => $request->code_postal,
-                'telephone' => $request->telephone,
-                'description' => $request->description,
-            ]);
-
-            if ($request->methode_paiement === 'par_carte') {
-                Stripe::setApiKey(env('STRIPE_SECRET'));
-
-                $charge = Charge::create([
-                    'amount' => $montantTotal * 100,
-                    'currency' => 'eur',
-                    'source' => $request->stripeToken,
-                    'description' => 'Paiement de la commande',
-                ]);
-
-                $paiement = Paiements::create([
-                    'user_id' => $user->id,
-                    'commandes_id' => $commande->id,
-                    'livraisondetails_id' => $livraisonDetails->id,
-                    'methode_paiement' => $request->methode_paiement,
-                    'numero_carte' => $request->numero_carte,
-                    'nom_detenteur_carte' => $request->nom_detenteur_carte,
-                    'mois_validite' => $request->mois_validite,
-                    'annee_validite' => $request->annee_validite,
-                    'code_secret' => $request->code_secret,
-                    'adresse_facturation' => $request->adresse_facturation,
-                    'prix_total' => $montantTotal,
-                ]);
-
-                $commande->update(['paiement_id' => $paiement->id]);
-            }
-
-            foreach ($validatedData['produits'] as $produitCommande) {
-                $produit = Produits::find($produitCommande['id']);
-                if (!$produit) {
-                    return response()->json(['message' => "Le produit avec l'ID {$produitCommande['id']} n'existe pas"], 400);
+                    if ($quantiteRestante > 0) {
+                        $panier->produits()->updateExistingPivot($produitDansPanier->id, [
+                            'quantite' => $quantiteRestante,
+                        ]);
+                    } else {
+                        $panier->produits()->detach($produitDansPanier->id);
+                    }
                 }
 
-                $commande->produits()->attach($produitCommande['id'], [
-                    'quantite' => $produitCommande['quantite'],
-                    'taille' => $produitCommande['taille'],
-                    'couleur' => $produitCommande['couleur'],
-                    'prix_total' => $produit->prix * $produitCommande['quantite'],
-                ]);
+        DB::commit();
 
-                $quantiteDisponible = Quantitedisponible::where('produits_id', $produitCommande['id'])
-                    ->where('tailles_id', $taille->id)
-                    ->where('couleurs_id', $couleur->id)
-                    ->first();
+        // Notification aux admins
+        $admins = User::whereHas('roles', function ($query) {
+            $query->where('name', 'admin');
+        })->get();
 
-                if ($quantiteDisponible) {
-                    $quantiteDisponible->decrement('quantite', $produitCommande['quantite']);
-                }
-            }
+        Notification::send($admins, new CommandeNotifiee($commande));
 
-            $idsProduitsCommandes = $produitsCommandeCollection->pluck('id')->toArray();
-            foreach ($panier->produits as $produitDansPanier) {
-                if (!in_array($produitDansPanier->id, $idsProduitsCommandes)) {
-                    continue;
-                }
-
-                $produitCommande = $produitsCommandeCollection->firstWhere('id', $produitDansPanier->id);
-                $quantiteRestante = $produitDansPanier->pivot->quantite - $produitCommande['quantite'];
-
-                if ($quantiteRestante > 0) {
-                    $panier->produits()->updateExistingPivot($produitDansPanier->id, [
-                        'quantite' => $quantiteRestante,
-                    ]);
-                } else {
-                    $panier->produits()->detach($produitDansPanier->id);
-                }
-            }
-
-            DB::commit();
-
-            $admins = User::whereHas('roles', function ($query) {
-                $query->where('name', 'admin');
-            })->get();
-
-            Notification::send($admins, new CommandeNotifiee($commande));
-
-            return response()->json(['message' => 'Commande passée avec succès.', 'commande' => $commande], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Une erreur est survenue lors du traitement de la commande.', 'error' => $e->getMessage()], 500);
-        }
+        return response()->json(['message' => 'Commande passée avec succès.', 'commande' => $commande], 201);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json(['message' => 'Une erreur est survenue lors du traitement de la commande.', 'error' => $e->getMessage()], 500);
     }
+}
+
+// public function commander(Request $request)
+// {
+//     $user = Auth::user();
+//     if (!$user) {
+//         return response()->json(['message' => 'Vous devez être connecté pour passer une commande'], 401);
+//     }
+
+//     $validator = \Validator::make($request->all(), [
+//         'adresse' => 'required|string|max:255',
+// 'ville' => 'required|string|max:255',
+// 'code_postal' => 'required|string|max:10',
+// 'telephone' => 'required|string|max:20',
+// 'description' => 'nullable|string',
+// 'methode_paiement' => 'required|string|in:apres_livraison,par_carte',
+// 'stripeToken' => 'required_if:methode_paiement,par_carte|string',
+// 'numero_carte' => 'required_if:methode_paiement,par_carte|string|max:20',
+// 'nom_detenteur_carte' => 'required_if:methode_paiement,par_carte|string|max:255',
+// 'mois_validite' => 'required_if:methode_paiement,par_carte|integer|min:1|max:12',
+// 'annee_validite' => 'required_if:methode_paiement,par_carte|integer|min:' . date('Y'),
+// 'code_secret' => 'required_if:methode_paiement,par_carte|string|max:4',
+// 'adresse_facturation' => 'required_if:methode_paiement,par_carte|string|max:255',
+// 'produits' => 'required|array',
+// 'produits.*.id' => 'required|integer|exists:produits,id',
+// 'produits.*.quantite' => 'required|integer|min:1',
+// 'produits.*.taille' => 'required|string',
+// 'produits.*.couleur' => 'required|string',
+//     ]);
+
+//     if ($validator->fails()) {
+//         return response()->json(['errors' => $validator->errors()], 400);
+//     }
+
+//     $validatedData = $validator->validated();
+//     $panier = Paniers::where('user_id', $user->id)->first();
+
+//     if (!$panier) {
+//         return response()->json(['message' => 'Votre panier est vide'], 400);
+//     }
+
+//     $produitsPanier = $panier->produits()->get()->keyBy('produit_id');
+
+//     $produitsCommandeCollection = collect($validatedData['produits']);
+
+//     foreach ($validatedData['produits'] as $produitCommande) {
+//         $produit = Produits::find($produitCommande['id']);
+//         if (!$produit) {
+//             return response()->json(['message' => "Le produit avec l'ID {$produitCommande['id']} n'existe pas"], 400);
+//         }
+
+//         $taille = Tailles::where('nom', $produitCommande['taille'])->first();
+//         if (!$taille) {
+//             return response()->json(['message' => 'La taille spécifiée n\'est pas valide pour ce produit'], 400);
+//         }
+
+//         $couleur = Couleurs::where('nom', $produitCommande['couleur'])->first();
+//         if (!$couleur) {
+//             return response()->json(['message' => 'La couleur spécifiée n\'est pas valide pour ce produit'], 400);
+//         }
+
+//         $quantiteDisponible = Quantitedisponible::where('produits_id', $produitCommande['id'])
+//             ->where('tailles_id', $taille->id)
+//             ->where('couleurs_id', $couleur->id)
+//             ->first();
+
+//         if (!$quantiteDisponible || $produitCommande['quantite'] <= 0 || $produitCommande['quantite'] > $quantiteDisponible->quantite) {
+//             return response()->json(['message' => 'La quantité spécifiée n\'est pas disponible pour ce produit'], 400);
+//         }
+
+//         $prixTotal = $produit->prix * $produitCommande['quantite'];
+
+//         if (isset($produitsPanier[$produitCommande['id']])) {
+//             $produitPanier = $produitsPanier[$produitCommande['id']];
+//             $nouvelleQuantite = $produitPanier->pivot->quantite + $produitCommande['quantite'];
+
+//             if ($nouvelleQuantite > $quantiteDisponible->quantite) {
+//                 return response()->json(['message' => 'La quantité totale demandée dépasse la quantité disponible en stock'], 400);
+//             }
+
+//             $panier->produits()->updateExistingPivot($produitCommande['id'], [
+//                 'quantite' => $nouvelleQuantite,
+//                 'taille' => $taille->nom,
+//                 'couleur' => $couleur->nom,
+//                 'prix_total' => $prixTotal
+//             ]);
+//         } else {
+//             $panier->produits()->attach($produitCommande['id'], [
+//                 'taille' => $taille->nom,
+//                 'couleur' => $couleur->nom,
+//                 'quantite' => $produitCommande['quantite'],
+//                 'prix_total' => $prixTotal
+//             ]);
+//         }
+//     }
+
+//     $montantTotalProduits = $panier->produits->sum(function ($produit) {
+//         return $produit->pivot->prix_total;
+//     });
+
+//     $fraisLivraison = $this->obtenirFraisLivraison();
+
+//     $montantTotal = $montantTotalProduits + $fraisLivraison;
+
+
+//     DB::beginTransaction();
+
+//     try {
+//         $commande = Commandes::create([
+//             'user_id' => $user->id,
+//             'montant_total' => $montantTotal,
+//             'statut' => 'en attente',
+//             'paiement_id' => null,
+//             'methode_paiement' => $request->methode_paiement,
+//         ]);
+
+//         $livraisonDetails = LivraisonDetails::create([
+//             'user_id' => $user->id,
+//             'commandes_id' => $commande->id,
+//             'adresse' => $request->adresse,
+//             'ville' => $request->ville,
+//             'code_postal' => $request->code_postal,
+//             'telephone' => $request->telephone,
+//             'description' => $request->description,
+//         ]);
+
+//         if ($request->methode_paiement === 'par_carte') {
+//             Stripe::setApiKey(env('STRIPE_SECRET'));
+
+//             $charge = Charge::create([
+//                 'amount' => $montantTotal * 100,
+//                 'currency' => 'eur',
+//                 'source' => $request->stripeToken,
+//                 'description' => 'Paiement de la commande',
+//             ]);
+
+//             $paiement = Paiements::create([
+//                 'user_id' => $user->id,
+//                 'commandes_id' => $commande->id,
+//                 'livraisondetails_id' => $livraisonDetails->id,
+//                 'methode_paiement' => $request->methode_paiement,
+//                 'numero_carte' => $request->numero_carte,
+//                 'nom_detenteur_carte' => $request->nom_detenteur_carte,
+//                 'mois_validite' => $request->mois_validite,
+//                 'annee_validite' => $request->annee_validite,
+//                 'code_secret' => $request->code_secret,
+//                 'adresse_facturation' => $request->adresse_facturation,
+//                 'prix_total' => $montantTotal,
+//             ]);
+
+//             $commande->update(['paiement_id' => $paiement->id]);
+//         }
+//         \Log::info("Prix total du produit {$produit->id}: " . $prixTotal);
+//         \Log::info("Montant total des produits: " . $montantTotalProduits);
+//         \Log::info("Frais de livraison: " . $fraisLivraison);
+//         \Log::info("Montant total de la commande: " . $montantTotal);
+
+
+//         foreach ($validatedData['produits'] as $produitCommande) {
+//             $produit = Produits::find($produitCommande['id']);
+//             if (!$produit) {
+//                 return response()->json(['message' => "Le produit avec l'ID {$produitCommande['id']} n'existe pas"], 400);
+//             }
+
+//             $commande->produits()->attach($produitCommande['id'], [
+//                 'quantite' => $produitCommande['quantite'],
+//                 'taille' => $produitCommande['taille'],
+//                 'couleur' => $produitCommande['couleur'],
+//                 'prix_total' => $produit->prix * $produitCommande['quantite'],
+//             ]);
+
+//             $quantiteDisponible = Quantitedisponible::where('produits_id', $produitCommande['id'])
+//                 ->where('tailles_id', $taille->id)
+//                 ->where('couleurs_id', $couleur->id)
+//                 ->first();
+
+//             if ($quantiteDisponible) {
+//                 $quantiteDisponible->decrement('quantite', $produitCommande['quantite']);
+//             }
+//         }
+
+//         $idsProduitsCommandes = $produitsCommandeCollection->pluck('id')->toArray();
+//         foreach ($panier->produits as $produitDansPanier) {
+//             if (!in_array($produitDansPanier->id, $idsProduitsCommandes)) {
+//                 continue;
+//             }
+
+//             $produitCommande = $produitsCommandeCollection->firstWhere('id', $produitDansPanier->id);
+//             $quantiteRestante = $produitDansPanier->pivot->quantite - $produitCommande['quantite'];
+
+//             if ($quantiteRestante > 0) {
+//                 $panier->produits()->updateExistingPivot($produitDansPanier->id, [
+//                     'quantite' => $quantiteRestante,
+//                 ]);
+//             } else {
+//                 $panier->produits()->detach($produitDansPanier->id);
+//             }
+//         }
+
+//         DB::commit();
+
+//         $admins = User::whereHas('roles', function ($query) {
+//             $query->where('name', 'admin');
+//         })->get();
+
+//         Notification::send($admins, new CommandeNotifiee($commande));
+
+//         return response()->json(['message' => 'Commande passée avec succès.', 'commande' => $commande], 201);
+//     } catch (\Exception $e) {
+//         DB::rollBack();
+//         return response()->json(['message' => 'Une erreur est survenue lors du traitement de la commande.', 'error' => $e->getMessage()], 500);
+//     }
+// }
     public function Adressexistente()
     {
         // Get the currently authenticated user
@@ -303,65 +497,68 @@ class CommandesController extends Controller
     }
 
     public function detailsCommandes()
-    {
-        $user = Auth::user();
-        $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
+{
+    $user = Auth::user();
+    $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
-        if (!$user || !$user->hasAnyRole($roles)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        // Récupérer toutes les commandes avec les détails associés
-        $commandes = Commandes::with([
-            'livraisonDetails',
-            'produits' => function ($query) {
-                $query->select('produits.id', 'produits.references', 'produits.nom_produit');
-            },
-            'paiement',
-            'user' // Inclure la relation utilisateur
-        ])->get();
-
-        $result = $commandes->map(function ($commande) {
-            return [
-                'commande_id' => $commande->id,
-                'montant_total' => $commande->montant_total,
-                'statut' => $commande->statut,
-                'methode_paiement' => $commande->methode_paiement, // Accéder directement à la colonne
-
-                'frais_livraison' => $this->obtenirFraisLivraison(),
-                'details_livraison' => [
-                    'adresse' => $commande->livraisonDetails->adresse,
-                    'ville' => $commande->livraisonDetails->ville,
-                    'code_postal' => $commande->livraisonDetails->code_postal,
-                    'telephone' => $commande->livraisonDetails->telephone,
-                    'description' => $commande->livraisonDetails->description,
-                ],
-                'produits_commandes' => $commande->produits->map(function ($produit) {
-                    return [
-                        'produit_id' => $produit->id,
-                        'reference' => $produit->references,
-                        'nom' => $produit->nom_produit,
-                        'quantite' => $produit->pivot->quantite,
-                        'taille' => $produit->pivot->taille,
-                        'couleur' => $produit->pivot->couleur,
-                        'prix_total' => $produit->pivot->prix_total,
-                    ];
-                }),
-                'details_paiement' => $commande->paiement ? [
-                    'methode_paiement' => $commande->paiement->methode_paiement,
-                    'adresse_facturation' => $commande->paiement->adresse_facturation,
-                    'prix_total' => $commande->paiement->prix_total,
-                ] : null,
-                'user_details' => [
-                    'prenom' => $commande->user ? $commande->user->prenom : null,
-                    'nom' => $commande->user ? $commande->user->nom : null,
-                    'user_name' => $commande->user ? $commande->user->user_name : null,
-                ],
-            ];
-        });
-
-        return response()->json(['commandes' => $result], 200);
+    if (!$user || !$user->hasAnyRole($roles)) {
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
+
+    // Récupérer toutes les commandes avec les détails associés
+    $commandes = Commandes::with([
+        'livraisonDetails',
+        'produits' => function ($query) {
+            $query->select('produits.id', 'produits.references', 'produits.nom_produit');
+        },
+        'paiement',
+        'user' // Inclure la relation utilisateur
+        ])->orderBy('created_at', 'desc') // Trier les commandes par date de création, les plus récentes en premier
+        ->get();
+
+
+    $result = $commandes->map(function ($commande) {
+        return [
+            'commande_id' => $commande->id,
+            'montant_total' => $commande->montant_total,
+            'statut' => $commande->statut,
+            'methode_paiement' => $commande->methode_paiement, // Accéder directement à la colonne
+
+            'frais_livraison' => $this->obtenirFraisLivraison(),
+            'details_livraison' => $commande->livraisonDetails ? [ // Vérifier si la relation existe
+                'adresse' => $commande->livraisonDetails->adresse,
+                'ville' => $commande->livraisonDetails->ville,
+                'code_postal' => $commande->livraisonDetails->code_postal,
+                'telephone' => $commande->livraisonDetails->telephone,
+                'description' => $commande->livraisonDetails->description,
+            ] : null, // Si la relation est null, retourner null
+            'produits_commandes' => $commande->produits->map(function ($produit) {
+                return [
+                    'produit_id' => $produit->id,
+                    'reference' => $produit->references,
+                    'nom' => $produit->nom_produit,
+                    'quantite' => $produit->pivot->quantite,
+                    'taille' => $produit->pivot->taille,
+                    'couleur' => $produit->pivot->couleur,
+                    'prix_total' => $produit->pivot->prix_total,
+                ];
+            }),
+            'details_paiement' => $commande->paiement ? [
+                'methode_paiement' => $commande->paiement->methode_paiement,
+                'adresse_facturation' => $commande->paiement->adresse_facturation,
+                'prix_total' => $commande->paiement->prix_total,
+            ] : null,
+            'user_details' => [
+                'prenom' => $commande->user ? $commande->user->prenom : null,
+                'nom' => $commande->user ? $commande->user->nom : null,
+                'user_name' => $commande->user ? $commande->user->user_name : null,
+            ],
+        ];
+    });
+
+    return response()->json(['commandes' => $result], 200);
+}
+
 
     public function exporterCommandePDF($commande_id)
     {

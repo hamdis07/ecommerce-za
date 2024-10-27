@@ -91,7 +91,7 @@ class SuperAdminController extends Controller
     $rules = [
         'nom' => 'nullable|string|max:255',
         'prenom' => 'nullable|string|max:255',
-        'genre' => 'nullable|string|in:Male,Female,Other,femme,homme,autre',
+        'genre' => 'nullable|string|in:Male,Female,Other,femme,homme,autre,Femme,Homme,Autre',
         'date_de_naissance' => 'nullable|date',
         'addresse' => 'nullable|string|max:255',
         'occupation' => 'nullable|string|max:255',
@@ -490,20 +490,20 @@ public function updateclient(Request $request, $id)
         return response()->json(['message' => 'Unauthorized'], 403);
     }
     $rules = [
-        'nom' => 'sometimes|string|max:255',
-        'prenom' => 'sometimes|string|max:255',
-        'genre' => 'sometimes|string|in:Male,Female,Other,femme,homme,autre',
-        'date_de_naissance' => 'sometimes|date',
-        'addresse' => 'sometimes|string|max:255',
-        'occupation' => 'sometimes|string|max:255',
-        'etat_social' => 'sometimes|string|max:255',
-        'numero_telephone' => 'sometimes|string|max:255',
-        'user_name' => 'sometimes|string|max:255|unique:users,user_name,' . $id,
-        'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
+        'nom' => 'nullable|string|max:255',
+        'prenom' => 'nullable|string|max:255',
+        'genre' => 'nullable|string|in:Male,Female,Other,Femme,Homme,Autre',
+        'date_de_naissance' => 'nullable|date',
+        'addresse' => 'nullable|string|max:255',
+        'occupation' => 'nullable|string|max:255',
+        'etat_social' => 'nullable|string|max:255',
+        'numero_telephone' => 'nullable|string|max:255',
+        'user_name' => 'nullable|string|max:255|unique:users,user_name,' . $id,
+        'email' => 'nullable|string|email|max:255|unique:users,email,' . $id,
         'password' => 'nullable|string|min:8',
         'user_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        'role' => 'sometimes|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing',
-        'status' => 'sometimes|string|in:actif,non actif,en attente,bloqué',
+        'role' => 'nullable|string|in:admin,superadmin,client,operateur,dispatcheur,responsable_marketing',
+        'status' => 'nullable|string|in:actif,non actif,en attente,bloqué',
     ];
 
     try {
@@ -527,7 +527,7 @@ public function updateclient(Request $request, $id)
         }
 
 
-        $user->fill(array_filter([
+        $user->update(array_filter([
             'nom' => $validatedData['nom'] ?? $user->nom,
             'prenom' => $validatedData['prenom'] ?? $user->prenom,
             'genre' => $validatedData['genre'] ?? $user->genre,

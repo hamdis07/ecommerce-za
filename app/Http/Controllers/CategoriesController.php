@@ -18,21 +18,16 @@ use Illuminate\Http\Request;
         public function index(Request $request)
         {
             $search = $request->input('search');
-            $perPage = $request->input('perPage', 10); // Par défaut, 10 éléments par page
             $categoriesQuery = Categories::query();
 
-            // Appliquer la recherche si elle est présente
             if ($search) {
                 $categoriesQuery->where('name', 'like', '%' . $search . '%');
             }
 
-            $categories = $categoriesQuery->paginate($perPage);
+            $categories = $categoriesQuery->get();
 
             return response()->json([
-                'data' => $categories->items(),
-                'currentPage' => $categories->currentPage(),
-                'totalPages' => $categories->lastPage(),
-                'totalItems' => $categories->total(),
+                'data' => $categories,
             ]);
         }
 
@@ -43,10 +38,8 @@ use Illuminate\Http\Request;
             return response()->json($categorie);
         }
 
-        // Enregistrer une nouvelle catégorie
         public function store(Request $request)
         {
-            // Check if the user is authenticated and has the required roles
             $user = Auth::user();
             $roles = ['admin', 'superadmin', 'dispatcheur', 'operateur', 'responsable_marketing'];
 
@@ -54,15 +47,12 @@ use Illuminate\Http\Request;
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            // Validate the incoming request data
             $validatedData = $request->validate([
                 'nom' => 'required|string|max:255', // Make sure 'nom' is required
             ]);
 
-            // Create the category using the validated data
             $categorie = Categories::create($validatedData);
 
-            // Return the created category with a success response
             return response()->json($categorie, 201);
         }
         // Mettre à jour une catégorie

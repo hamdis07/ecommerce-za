@@ -75,30 +75,52 @@ public function scopeFilterByGenre($query, $genreId)
 {
     return $query->where('genre_id', $genreId);
 }
-
-public function scopeFilterByPriceRange($query, $minPrice, $maxPrice)
-{
-    return $query->whereBetween('prix', [$minPrice, $maxPrice]);
-}
-
-public function scopeFilterByColor($query, $colorId)
-{
-    return $query->whereHas('couleurs', function ($query) use ($colorId) {
-        $query->where('couleurs.id', $colorId);
-    });
-}
-
-public function scopeFilterBySize($query, $sizeId)
-{
-    return $query->whereHas('tailles', function ($query) use ($sizeId) {
-        $query->where('tailles.id', $sizeId);
-    });
-}
-
 public function scopeFilterByKeyword($query, $keyword)
 {
-    return $query->where('mots_cles', 'like', '%' . $keyword . '%');
+    return $query->where(function($q) use ($keyword) {
+        $q->where('nom_produit', 'like', '%' . $keyword . '%')
+          ->orWhere('description', 'like', '%' . $keyword . '%')
+          ->orWhere('mots_cles', 'like', '%' . $keyword . '%');
+    });
 }
+public function scopeFilterByNew($query)
+{
+    return $query->orderBy('created_at', 'desc');
+}
+public function scopeFilterByPromo($query)
+{
+    return $query->whereHas('promos', function ($query) {
+        $query->whereNotNull('promo_id');
+    });
+}
+public function scopeFilterByPopularity($query)
+{
+    return $query->select('produits.id', 'produits.nom_produit', \DB::raw('COUNT(commandesproduits.produits_id) as total_commandes'))
+        ->join('commandesproduits', 'produits.id', '=', 'commandesproduits.produits_id')
+        ->groupBy('produits.id', 'produits.nom_produit') // Assurez-vous de grouper toutes les colonnes non agrégées
+        ->orderBy('total_commandes', 'desc');
+}
+
+// public function scopeFilterByPriceRange($query, $minPrice, $maxPrice)
+// {
+//     return $query->whereBetween('prix', [$minPrice, $maxPrice]);
+// }
+
+// public function scopeFilterByColor($query, $colorId)
+// {
+//     return $query->whereHas('couleurs', function ($query) use ($colorId) {
+//         $query->where('couleurs.id', $colorId);
+//     });
+// }
+
+// public function scopeFilterBySize($query, $sizeId)
+// {
+//     return $query->whereHas('tailles', function ($query) use ($sizeId) {
+//         $query->where('tailles.id', $sizeId);
+//     });
+// }
+
+
 public function commandes()
 {
     return $this->belongsToMany(Commandes::class, 'commandesproduits')

@@ -113,12 +113,10 @@ if (!$quantiteDisponible || $quantite <= 0 || $quantite > $quantiteDisponible->q
    }
    public function mettreAJourPanier(Request $request, $produitId)
    {
-       // Vérification si l'utilisateur est connecté
        if (!Auth::check()) {
            return response()->json(['message' => 'Vous devez être connecté pour mettre à jour le panier'], 401);
        }
 
-       // Récupération de l'utilisateur et de son panier
        $user = Auth::user();
        $paniers = $user->paniers()->first();
 
@@ -126,31 +124,26 @@ if (!$quantiteDisponible || $quantite <= 0 || $quantite > $quantiteDisponible->q
            return response()->json(['message' => 'Panier non trouvé'], 404);
        }
 
-       // Recherche du produit dans la base de données
        $produit = Produits::find($produitId);
 
        if (!$produit) {
            return response()->json(['message' => 'Produit non trouvé'], 404);
        }
 
-       // Récupération des attributs taille, couleur, et quantité
        $tailleNom = $request->input('taille');
        $couleurNom = $request->input('couleur');
        $quantite = $request->input('quantite');
 
-       // Vérification de la taille
        $taille = Tailles::where('nom', $tailleNom)->first();
        if (!$taille) {
            return response()->json(['message' => 'La taille spécifiée n\'est pas valide pour ce produit'], 400);
        }
 
-       // Vérification de la couleur
        $couleur = Couleurs::where('nom', $couleurNom)->first();
        if (!$couleur) {
            return response()->json(['message' => 'La couleur spécifiée n\'est pas valide pour ce produit'], 400);
        }
 
-       // Vérification de la quantité disponible
        $quantiteDisponible = Quantitedisponible::where('produits_id', $produitId)
            ->where('tailles_id', $taille->id)
            ->where('couleurs_id', $couleur->id)
@@ -160,10 +153,8 @@ if (!$quantiteDisponible || $quantite <= 0 || $quantite > $quantiteDisponible->q
            return response()->json(['message' => 'La quantité spécifiée n\'est pas disponible pour ce produit'], 400);
        }
 
-       // Calcul du prix total pour cette ligne de commande
        $prixTotal = $produit->prix * $quantite;
 
-       // Mise à jour du produit dans le panier
        $paniers->produits()->updateExistingPivot($produitId, [
            'taille' => $taille->nom,
            'couleur' => $couleur->nom,
